@@ -3,776 +3,768 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>// CYBERPUNK 2077 // NEURAL SCAN //</title>
-  <meta name="description" content="Arasaka Neural Scanner - Real-time object detection interface">
-  <meta name="theme-color" content="#ff0000">
-  
-  <!-- TensorFlow.js и COCO-SSD -->
+  <title>NEURAL SCANNER // CYBERPUNK 2077</title>
+  <!-- Font Awesome (иконки) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- TensorFlow.js и модель COCO-SSD (указанные версии) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
-  
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
-
+    /* === СБРОС & КИБЕРПАНК ОСНОВА === */
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
     }
 
     body {
-      background: #0d0a05;
+      background: #0c0b16;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Rajdhani', sans-serif;
-      padding: 10px;
-      background-image: 
-        repeating-linear-gradient(0deg, rgba(255, 0, 0, 0.03) 0px, transparent 2px),
-        repeating-linear-gradient(90deg, rgba(255, 200, 0, 0.02) 0px, transparent 3px);
+      padding: 12px;
       position: relative;
+      overflow-x: hidden;
     }
 
+    /* Сканирующая сетка фона */
     body::before {
-      content: '';
+      content: "";
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(circle at 30% 40%, rgba(255, 50, 0, 0.08), transparent 60%);
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-image: 
+        linear-gradient(rgba(0, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.08) 1px, transparent 1px);
+      background-size: 30px 30px;
       pointer-events: none;
+      z-index: 0;
     }
 
-    /* Главный контейнер в стиле киберимпланта */
-    .cyberdeck {
-      max-width: 950px;
-      width: 100%;
-      background: linear-gradient(135deg, #0f0a05 0%, #1a0f08 100%);
-      border: 3px solid;
-      border-image: repeating-linear-gradient(45deg, #ff0000, #ff4400, #ff0000) 30;
-      box-shadow: 
-        0 0 60px rgba(255, 0, 0, 0.5),
-        inset 0 0 40px rgba(255, 0, 0, 0.1),
-        0 0 0 2px #ffcc00 inset;
-      padding: 20px 18px 24px;
-      display: flex;
-      flex-direction: column;
-      clip-path: polygon(0% 0%, 100% 0%, 100% 95%, 96% 100%, 0% 100%);
+    /* Глитч-линии */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(0deg, rgba(255, 0, 255, 0.02) 0px, transparent 2px, rgba(0, 255, 255, 0.02) 4px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .scanner-container {
       position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 720px;
+      border: 3px solid #00ffff;
+      border-radius: 24px;
+      padding: 18px 18px 22px;
+      background: rgba(8, 8, 20, 0.75);
+      backdrop-filter: blur(8px);
+      box-shadow: 
+        0 0 30px rgba(0, 255, 255, 0.3),
+        inset 0 0 20px rgba(0, 255, 255, 0.1),
+        0 0 0 1px #ff00ff inset;
+      transition: box-shadow 0.2s ease;
     }
 
-    /* Декоративные болты */
-    .cyberdeck::before,
-    .cyberdeck::after {
-      content: '';
-      position: absolute;
-      width: 20px; height: 20px;
-      border: 3px solid #ffcc00;
-      box-shadow: 0 0 15px #ff0000;
-    }
-    .cyberdeck::before { top: -8px; left: 20px; border-right: none; border-bottom: none; }
-    .cyberdeck::after { bottom: -8px; right: 20px; border-left: none; border-top: none; }
-
-    /* Шапка в стиле интерфейса */
-    .interface-header {
+    /* Заголовок с неоновыми элементами */
+    .cyber-header {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: flex-end;
-      border-bottom: 3px solid #ff0000;
+      margin-bottom: 16px;
+      padding: 0 6px;
+      border-bottom: 2px dashed #ff00ff;
       padding-bottom: 12px;
-      margin-bottom: 20px;
-      position: relative;
     }
 
-    .interface-header::after {
-      content: '';
-      position: absolute;
-      bottom: -5px; left: 0;
-      width: 100%; height: 2px;
-      background: linear-gradient(90deg, #ffcc00, #ff0000, #ffcc00);
-      filter: blur(2px);
-    }
-
-    .title-block {
+    .header-left {
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      gap: 12px;
     }
 
-    .corp-label {
-      color: #ffcc00;
-      font-size: 0.8rem;
-      letter-spacing: 6px;
+    .header-left i {
+      font-size: 28px;
+      color: #ff00ff;
+      text-shadow: 0 0 15px #ff00ff;
+    }
+
+    .header-left h1 {
+      font-size: 1.7rem;
+      font-weight: 400;
+      letter-spacing: 4px;
+      color: #00ffff;
+      text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
       text-transform: uppercase;
-      font-weight: 600;
-      text-shadow: 0 0 10px #ffcc00;
+    }
+    /* Адаптация для телефонов */
+    @media (max-width: 480px) {
+      .header-left h1 {
+        font-size: 1.2rem;
+        letter-spacing: 2px;
+      }
+      .header-left i {
+        font-size: 22px;
+      }
+      .scanner-container {
+        padding: 12px 12px 18px;
+        border-width: 2px;
+      }
     }
 
-    .main-title {
-      font-size: 2.4rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: #ff0000;
-      text-shadow: 
-        0 0 30px #ff0000,
-        0 0 60px #ff4400,
-        2px 2px 0 #8b0000;
-      letter-spacing: 8px;
-      line-height: 1;
-      font-style: italic;
-      transform: skew(-5deg);
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f0e1a;
+      padding: 6px 14px;
+      border-radius: 40px;
+      border: 1px solid #00ffff;
+      box-shadow: 0 0 10px #00ffff66;
     }
 
-    .status-tag {
-      background: #1a0a00;
-      border: 2px solid #ffcc00;
-      padding: 8px 18px;
-      color: #ffcc00;
-      font-weight: 700;
-      letter-spacing: 3px;
-      clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+    .status-badge i {
+      color: #00ffaa;
+      font-size: 12px;
+      text-shadow: 0 0 8px #00ffaa;
+    }
+
+    .status-badge span {
+      color: #b0fffc;
       font-size: 0.9rem;
+      text-transform: uppercase;
     }
 
-    /* Область сканирования */
-    .scan-module {
-      position: relative;
-      border: 3px solid #ff0000;
-      background: #000;
-      margin-bottom: 18px;
-      box-shadow: 
-        0 0 50px rgba(255, 0, 0, 0.4),
-        inset 0 0 60px rgba(0, 0, 0, 0.9);
-      clip-path: polygon(0% 0%, 100% 0%, 100% 92%, 96% 100%, 0% 100%);
-    }
-
-    .video-container {
+    /* Видео область */
+    .video-wrapper {
       position: relative;
       width: 100%;
-      aspect-ratio: 4/3;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px solid #ff00ff;
+      box-shadow: 0 0 30px #ff00ff4d, inset 0 0 15px #00ffff33;
+      margin-bottom: 18px;
+      aspect-ratio: 16 / 12; /* гибкий, для смартфонов хорошо */
     }
 
-    @media (max-width: 480px) {
-      .video-container { aspect-ratio: auto; min-height: 280px; }
-      .main-title { font-size: 1.8rem; letter-spacing: 4px; }
-    }
-
-    #video {
+    #webcam {
       width: 100%;
       height: 100%;
-      object-fit: cover;
       display: block;
-      filter: contrast(1.3) brightness(0.9) saturate(1.5) sepia(0.2);
+      object-fit: cover;
+      transform: scaleX(-1); /* зеркалим, чтобы было естественно */
     }
 
     #canvas {
       position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
+      transform: scaleX(-1); /* синхронно с видео */
     }
 
-    /* Голографический прицел */
-    .holo-reticle {
+    /* Оверлей с перекрестием сканера */
+    .scan-overlay {
       position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 120px; height: 120px;
-      border: 1px solid rgba(255, 0, 0, 0.3);
-      border-radius: 50%;
+      top: 0; left: 0; width: 100%; height: 100%;
       pointer-events: none;
-      z-index: 5;
-      box-shadow: 0 0 40px rgba(255, 0, 0, 0.2);
+      border: 1px solid rgba(0, 255, 255, 0.25);
+      box-shadow: inset 0 0 40px rgba(0, 255, 255, 0.1);
     }
-
-    .holo-reticle::before,
-    .holo-reticle::after {
-      content: '';
+    .corner {
       position: absolute;
-      background: rgba(255, 0, 0, 0.6);
-    }
-    .holo-reticle::before {
-      width: 100%; height: 1px;
-      top: 50%;
-      box-shadow: 0 0 20px #ff0000;
-    }
-    .holo-reticle::after {
-      width: 1px; height: 100%;
-      left: 50%;
-      box-shadow: 0 0 20px #ff0000;
-    }
-
-    /* Сканирующая строка */
-    .scan-beam {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, #ff0000, #ffcc00, #ff0000, transparent);
-      box-shadow: 0 0 30px #ff0000;
-      opacity: 0.8;
-      animation: scanDown 3s ease-in-out infinite;
-      pointer-events: none;
-      z-index: 4;
-    }
-
-    @keyframes scanDown {
-      0% { top: -5px; opacity: 0.9; }
-      80% { opacity: 0.5; }
-      100% { top: 100%; opacity: 0; }
-    }
-
-    /* Угловые маркеры */
-    .corner-marker {
-      position: absolute;
-      width: 40px; height: 40px;
-      border-color: #ff0000;
+      width: 25px; height: 25px;
+      border-color: #00ffff;
       border-style: solid;
-      filter: drop-shadow(0 0 12px #ff0000);
-      z-index: 3;
+      filter: drop-shadow(0 0 8px cyan);
     }
-    .tl { top: 10px; left: 10px; border-width: 4px 0 0 4px; }
-    .tr { top: 10px; right: 10px; border-width: 4px 4px 0 0; }
-    .bl { bottom: 10px; left: 10px; border-width: 0 0 4px 4px; }
-    .br { bottom: 10px; right: 10px; border-width: 0 4px 4px 0; }
-
-    /* Загрузочный экран в стиле Arasaka */
-    .boot-sequence {
-      position: absolute;
-      inset: 0;
-      background: #0a0500;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 30;
-      border: 2px solid #ff0000;
-    }
-
-    .arasaka-logo {
-      font-size: 3rem;
-      font-weight: 700;
-      color: #ff0000;
-      text-shadow: 0 0 40px #ff0000;
-      letter-spacing: 15px;
-      margin-bottom: 30px;
-      animation: pulseRed 2s infinite;
-    }
-
-    @keyframes pulseRed {
-      0%, 100% { opacity: 1; text-shadow: 0 0 40px #ff0000; }
-      50% { opacity: 0.7; text-shadow: 0 0 80px #ff0000; }
-    }
-
-    .boot-text {
-      color: #ffcc00;
-      font-size: 1.2rem;
-      letter-spacing: 8px;
-      margin-bottom: 20px;
-    }
-
-    .progress-track {
-      width: 260px; height: 4px;
-      background: #2a1500;
-      border: 1px solid #ff0000;
-    }
-
-    .progress-fill {
-      width: 75%; height: 100%;
-      background: linear-gradient(90deg, #ff0000, #ffcc00);
-      box-shadow: 0 0 20px #ff0000;
-      animation: glitchProgress 1.5s infinite;
-    }
-
-    @keyframes glitchProgress {
-      0%, 100% { width: 75%; }
-      50% { width: 80%; opacity: 0.8; }
-    }
-
-    /* Панель данных */
-    .data-panel {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: linear-gradient(90deg, #1a0a00 0%, #0d0500 100%);
-      border: 2px solid #ffcc00;
-      padding: 12px 20px;
-      margin: 10px 0 16px;
-      clip-path: polygon(0% 0%, 100% 0%, 98% 100%, 0% 100%);
-      box-shadow: inset 0 0 20px #000, 0 0 30px rgba(255, 0, 0, 0.3);
-    }
-
-    .data-label {
-      color: #ffcc00;
-      font-weight: 600;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
-
-    .data-value {
-      font-size: 2.5rem;
-      font-weight: 700;
-      color: #ff0000;
-      text-shadow: 0 0 30px #ff0000;
-      font-family: 'Rajdhani', sans-serif;
-      line-height: 1;
-    }
-
-    /* Терминал обнаружений */
-    .target-terminal {
-      background: #0a0300;
-      border: 2px solid #ff0000;
-      padding: 14px 12px;
-      margin-bottom: 20px;
-      min-height: 100px;
-      max-height: 140px;
-      overflow-y: auto;
-      box-shadow: inset 0 0 40px #000, 0 0 20px rgba(255, 0, 0, 0.2);
-      scrollbar-width: thin;
-      scrollbar-color: #ff0000 #1a0a00;
-    }
-
-    .target-tag {
-      display: inline-block;
-      background: #1a0500;
-      border-left: 6px solid #ff0000;
-      border-bottom: 2px solid #ffcc00;
-      padding: 8px 18px;
-      margin: 5px;
-      color: #ffcc00;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      font-size: 0.9rem;
-      box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
-      clip-path: polygon(0% 0%, 95% 0%, 100% 100%, 0% 100%);
-    }
-
-    .no-targets {
-      color: #663300;
-      padding: 12px;
-      font-style: italic;
-      text-transform: uppercase;
-    }
+    .corner-tl { top: 10px; left: 10px; border-width: 3px 0 0 3px; }
+    .corner-tr { top: 10px; right: 10px; border-width: 3px 3px 0 0; }
+    .corner-bl { bottom: 10px; left: 10px; border-width: 0 0 3px 3px; }
+    .corner-br { bottom: 10px; right: 10px; border-width: 0 3px 3px 0; }
 
     /* Панель управления */
-    .control-deck {
+    .controls-panel {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 15px;
-      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
     }
 
-    .sys-indicator {
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .cyber-btn {
+      background: transparent;
+      border: 2px solid #00ffff;
+      color: #00ffff;
+      padding: 10px 20px;
+      border-radius: 40px;
+      font-size: 1rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 0 12px #00ffff66, inset 0 0 5px #00ffff33;
+      transition: 0.2s;
       display: flex;
       align-items: center;
-      gap: 15px;
-      background: #0a0300;
-      padding: 8px 22px;
-      border: 2px solid #ffcc00;
-      clip-path: polygon(5% 0%, 100% 0%, 95% 100%, 0% 100%);
+      gap: 10px;
     }
-
-    .led-red {
-      width: 18px; height: 18px;
-      background: #ff0000;
-      border-radius: 50%;
-      box-shadow: 0 0 25px #ff0000;
-      animation: blinkRed 1.5s infinite;
-    }
-
-    .led-red.off {
-      background: #4a0000;
-      box-shadow: none;
-      animation: none;
-    }
-
-    @keyframes blinkRed {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    .btn-cyber {
-      background: transparent;
-      border: 3px solid #ff0000;
-      color: #ff0000;
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      padding: 12px 28px;
+    .cyber-btn i {
       font-size: 1.1rem;
-      letter-spacing: 4px;
-      cursor: pointer;
-      text-transform: uppercase;
-      box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
-      transition: 0.1s;
-      clip-path: polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%);
-      background: rgba(255, 0, 0, 0.05);
+      color: #ff00ff;
+      text-shadow: 0 0 8px #ff00ff;
+    }
+    .cyber-btn:active {
+      background: #00ffff22;
+      box-shadow: 0 0 22px #00ffff, inset 0 0 8px white;
+      border-color: #ff00ff;
+      color: #fff;
+    }
+    @media (max-width: 480px) {
+      .cyber-btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        gap: 5px;
+      }
     }
 
-    .btn-cyber.scan-btn {
-      border-color: #ffcc00;
-      color: #ffcc00;
-      box-shadow: 0 0 30px rgba(255, 200, 0, 0.5);
-      background: rgba(255, 200, 0, 0.05);
+    .fps-counter {
+      background: #0f0e1a;
+      padding: 6px 16px;
+      border-radius: 30px;
+      border: 1px solid #ff00ff;
+      color: #ffb0ff;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .fps-counter i {
+      color: #00ffaa;
     }
 
-    .btn-cyber:active {
-      transform: scale(0.96);
-      background: rgba(255, 0, 0, 0.2);
-      box-shadow: 0 0 50px #ff0000;
+    /* Список обнаруженных объектов — киберпанк */
+    .detections-panel {
+      background: #05040cbb;
+      backdrop-filter: blur(5px);
+      border: 1px solid #00ffff;
+      border-radius: 20px;
+      padding: 14px 16px;
+      max-height: 200px;
+      overflow-y: auto;
+      box-shadow: inset 0 0 30px #000000, 0 0 15px #ff00ff33;
     }
 
-    .btn-cyber:disabled {
-      opacity: 0.3;
-      pointer-events: none;
-      filter: grayscale(0.7);
+    .detections-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: #ff66ff;
+      text-shadow: 0 0 5px magenta;
+      border-bottom: 1px dashed #00ffff66;
+      padding-bottom: 6px;
     }
 
-    #camStatusText {
-      color: #ffcc00;
-      font-weight: 600;
-      letter-spacing: 2px;
+    #detectionsList {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
-    /* Адаптация */
-    @media (max-width: 500px) {
-      .btn-cyber { padding: 10px 16px; font-size: 0.9rem; }
-      .data-value { font-size: 1.8rem; }
+    .detection-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #b7f9ff;
+      font-size: 1rem;
+      border-left: 3px solid #ff00ff;
+      padding-left: 12px;
+      text-transform: capitalize;
+      text-shadow: 0 0 6px cyan;
+    }
+
+    .detection-item i {
+      width: 20px;
+      color: #ff00ff;
+    }
+
+    .confidence {
+      margin-left: auto;
+      font-family: monospace;
+      color: #ffffaa;
+      background: #1a1f35;
+      padding: 2px 10px;
+      border-radius: 20px;
+      border: 1px solid #00ffff99;
+      font-size: 0.8rem;
+    }
+
+    /* placeholder */
+    .empty-message {
+      color: #6f8f9f;
+      font-style: italic;
+      padding: 6px 0;
+    }
+
+    /* скроллбар в стиле киберпанк */
+    .detections-panel::-webkit-scrollbar {
+      width: 5px;
+    }
+    .detections-panel::-webkit-scrollbar-thumb {
+      background: #ff00ff;
+      border-radius: 10px;
+      box-shadow: inset 0 0 6px white;
     }
   </style>
 </head>
 <body>
-
-<div class="cyberdeck">
+<div class="scanner-container">
   
-  <!-- Шапка -->
-  <div class="interface-header">
-    <div class="title-block">
-      <span class="corp-label">// ARASAKA //</span>
-      <div class="main-title">Kiroshi Scan</div>
+  <!-- ХЕДЕР -->
+  <div class="cyber-header">
+    <div class="header-left">
+      <i class="fas fa-eye"></i>
+      <h1>OBJ//SCAN</h1>
     </div>
-    <div class="status-tag">OPTICS v2.0</div>
-  </div>
-
-  <!-- Модуль сканирования -->
-  <div class="scan-module">
-    <div class="video-container">
-      <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas"></canvas>
-      
-      <!-- HUD элементы -->
-      <div class="holo-reticle"></div>
-      <div class="scan-beam"></div>
-      <div class="corner-marker tl"></div>
-      <div class="corner-marker tr"></div>
-      <div class="corner-marker bl"></div>
-      <div class="corner-marker br"></div>
-    </div>
-
-    <!-- Загрузка -->
-    <div id="bootScreen" class="boot-sequence">
-      <div class="arasaka-logo">ARASAKA</div>
-      <div class="boot-text">NEURAL LINK INIT</div>
-      <div class="progress-track">
-        <div class="progress-fill"></div>
-      </div>
-      <div style="color:#ffcc00; margin-top: 25px; letter-spacing: 3px;">COCO-SSD v2.2</div>
+    <div class="status-badge">
+      <i class="fas fa-circle"></i>
+      <span id="modelStatus">LOADING</span>
     </div>
   </div>
 
-  <!-- Данные -->
-  <div class="data-panel">
-    <span class="data-label">[ TARGETS ACQUIRED ]</span>
-    <span class="data-value" id="objectCount">00</span>
+  <!-- ВИДЕО ПОЛЕ -->
+  <div class="video-wrapper">
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="scan-overlay">
+      <div class="corner corner-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner corner-br"></div>
+    </div>
   </div>
 
-  <!-- Терминал целей -->
-  <div class="target-terminal" id="targetTerminal">
-    <div class="no-targets">> NO HOSTILES DETECTED_</div>
+  <!-- ПАНЕЛЬ УПРАВЛЕНИЯ -->
+  <div class="controls-panel">
+    <div class="btn-group">
+      <button class="cyber-btn" id="toggleCameraBtn"><i class="fas fa-power-off"></i> <span>ON/OFF</span></button>
+      <button class="cyber-btn" id="captureBtn"><i class="fas fa-camera-retro"></i> <span>SNAP</span></button>
+    </div>
+    <div class="fps-counter">
+      <i class="fas fa-microchip"></i>
+      <span id="fpsDisplay">-- FPS</span>
+    </div>
   </div>
 
-  <!-- Управление -->
-  <div class="control-deck">
-    <div class="sys-indicator">
-      <span class="led-red off" id="camLed"></span>
-      <span id="camStatusText">SYS.OFFLINE</span>
+  <!-- БЛОК ОБНАРУЖЕНИЙ -->
+  <div class="detections-panel">
+    <div class="detections-header">
+      <i class="fas fa-radar"></i>
+      <span>ACTIVE TARGETS //</span>
+      <i class="fas fa-chevron-right" style="font-size: 12px;"></i>
     </div>
-    <div style="display: flex; gap: 12px;">
-      <button class="btn-cyber" id="toggleCamBtn">[ POWER ]</button>
-      <button class="btn-cyber scan-btn" id="detectBtn" disabled>⟳ ANALYZE</button>
-    </div>
+    <ul id="detectionsList">
+      <li class="empty-message"><i class="fas fa-sync-alt fa-spin"></i> Ожидание камеры...</li>
+    </ul>
   </div>
 </div>
 
 <script>
-  (function() {
+  (function(){
     "use strict";
 
     // DOM элементы
-    const video = document.getElementById('video');
+    const video = document.getElementById('webcam');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const bootScreen = document.getElementById('bootScreen');
-    const camLed = document.getElementById('camLed');
-    const camStatusText = document.getElementById('camStatusText');
-    const toggleCamBtn = document.getElementById('toggleCamBtn');
-    const detectBtn = document.getElementById('detectBtn');
-    const objectCountSpan = document.getElementById('objectCount');
-    const terminalDiv = document.getElementById('targetTerminal');
+    const detectionsList = document.getElementById('detectionsList');
+    const modelStatusSpan = document.getElementById('modelStatus');
+    const fpsDisplay = document.getElementById('fpsDisplay');
+    const toggleBtn = document.getElementById('toggleCameraBtn');
+    const captureBtn = document.getElementById('captureBtn');
 
-    // Состояние
+    // Переменные состояния
     let model = null;
-    let isModelReady = false;
+    let cameraActive = false;
     let stream = null;
-    let isCameraActive = false;
-    let detectionInterval = null;
-    let isDetecting = false;
-    let lastDetections = [];
+    let animationFrame = null;
+    let lastPredictTime = 0;
+    const PREDICT_INTERVAL_MS = 150; // ограничение частоты детекции для плавности
+    let fps = 0;
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
 
-    // UI
-    function updateCameraUI(active) {
-      if (active) {
-        camLed.className = 'led-red';
-        camStatusText.textContent = 'OPTICS.ONLINE';
-        toggleCamBtn.innerHTML = '[ SHUTDOWN ]';
-      } else {
-        camLed.className = 'led-red off';
-        camStatusText.textContent = 'SYS.OFFLINE';
-        toggleCamBtn.innerHTML = '[ POWER ]';
+    // Статус модели
+    modelStatusSpan.innerText = 'LOADING MODEL...';
+    
+    // --- Загрузка COCO-SSD ---
+    async function loadModel() {
+      try {
+        model = await cocoSsd.load({
+          base: 'mobilenet_v2' // можно 'lite_mobilenet_v2' для скорости, но mobilenet_v2 мощнее
+        });
+        modelStatusSpan.innerText = 'MODEL READY';
+        console.log('COCO-SSD model loaded.');
+      } catch (err) {
+        modelStatusSpan.innerText = 'MODEL ERROR';
+        console.error('Ошибка загрузки модели:', err);
+        detectionsList.innerHTML = `<li class="empty-message"><i class="fas fa-exclamation-triangle"></i> Ошибка загрузки модели</li>`;
       }
     }
 
-    function setModelReady(ready) {
-      isModelReady = ready;
-      if (ready) {
-        bootScreen.style.opacity = '0';
-        setTimeout(() => { bootScreen.style.display = 'none'; }, 500);
-      } else {
-        bootScreen.style.display = 'flex';
-        bootScreen.style.opacity = '1';
+    // --- Инициализация камеры (адаптивная под смартфоны) ---
+    async function startCamera() {
+      try {
+        // Останавливаем предыдущий стрим если есть
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        
+        const constraints = {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'environment' // основная камера (можно 'user' для фронталки)
+          },
+          audio: false
+        };
+        
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        
+        // Ждём, пока видео начнёт играть
+        await new Promise(resolve => {
+          video.onloadedmetadata = () => {
+            resolve();
+          };
+        });
+        
+        await video.play();
+        
+        // Устанавливаем размеры canvas под реальное разрешение видео
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        canvas.width = videoWidth;
+        canvas.height = videoHeight;
+        
+        cameraActive = true;
+        toggleBtn.innerHTML = '<i class="fas fa-power-off"></i> <span>OFF</span>';
+        modelStatusSpan.innerText = model ? 'SCANNING' : 'MODEL LOADING';
+        
+        // Запускаем цикл детекции
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        predictLoop();
+        
+      } catch (err) {
+        console.error('Ошибка доступа к камере:', err);
+        cameraActive = false;
+        detectionsList.innerHTML = `<li class="empty-message"><i class="fas fa-ban"></i> Нет доступа к камере</li>`;
+        toggleBtn.innerHTML = '<i class="fas fa-power-off"></i> <span>ON</span>';
+        modelStatusSpan.innerText = 'CAM ERROR';
       }
     }
 
-    function updateTerminal(detections) {
-      const count = detections.length;
-      objectCountSpan.textContent = count.toString().padStart(2, '0');
-      
-      if (count === 0) {
-        terminalDiv.innerHTML = '<div class="no-targets">> NO HOSTILES DETECTED_</div>';
-        return;
-      }
-      
-      const sorted = [...detections].sort((a,b) => b.score - a.score);
-      let html = '';
-      for (let i = 0; i < Math.min(sorted.length, 12); i++) {
-        const d = sorted[i];
-        const percent = Math.round(d.score * 100);
-        html += `<span class="target-tag">◈ ${d.class} [${percent}%]</span>`;
-      }
-      if (sorted.length > 12) {
-        html += `<span class="target-tag">+${sorted.length-12} MORE</span>`;
-      }
-      terminalDiv.innerHTML = html;
-    }
-
+    // --- Остановка камеры ---
     function stopCamera() {
       if (stream) {
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach(track => track.stop());
         stream = null;
       }
       video.srcObject = null;
-      isCameraActive = false;
-      updateCameraUI(false);
+      cameraActive = false;
+      toggleBtn.innerHTML = '<i class="fas fa-power-off"></i> <span>ON</span>';
+      modelStatusSpan.innerText = model ? 'READY' : 'NO MODEL';
+      
+      // Очищаем canvas и список
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      lastDetections = [];
-      updateTerminal([]);
-      detectBtn.disabled = true;
-      stopDetectionLoop();
-    }
-
-    function stopDetectionLoop() {
-      if (detectionInterval) {
-        clearInterval(detectionInterval);
-        detectionInterval = null;
+      detectionsList.innerHTML = `<li class="empty-message"><i class="fas fa-video-slash"></i> Камера выключена</li>`;
+      fpsDisplay.innerText = '-- FPS';
+      
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
       }
-      isDetecting = false;
     }
 
-    async function startCamera() {
-      if (isCameraActive) return true;
-      try {
-        const constraints = { 
-          video: { 
-            facingMode: 'environment', 
-            width: { ideal: 1280 }, 
-            height: { ideal: 720 } 
-          }, 
-          audio: false 
-        };
-        let s;
-        try { 
-          s = await navigator.mediaDevices.getUserMedia(constraints); 
-        } catch { 
-          constraints.video.facingMode = undefined; 
-          s = await navigator.mediaDevices.getUserMedia(constraints); 
+    // --- Основной цикл детекции ---
+    function predictLoop() {
+      if (!cameraActive || !model) {
+        // Если камера неактивна, не продолжаем
+        if (cameraActive && !model) {
+          // модель ещё грузится
+          animationFrame = requestAnimationFrame(predictLoop);
         }
-        stream = s;
-        video.srcObject = stream;
-        await new Promise(r => { 
-          video.onloadedmetadata = () => { 
-            video.play().then(r).catch(r); 
-          }; 
-          if (video.readyState >= 2) video.play().then(r).catch(r); 
-        });
+        return;
+      }
+
+      async function detectionStep(now) {
+        try {
+          // Проверяем, готово ли видео
+          if (video.readyState === 4) {
+            
+            // FPS счётчик
+            frameCount++;
+            const timeSinceLastFps = now - lastFpsUpdate;
+            if (timeSinceLastFps >= 500) {
+              fps = Math.round((frameCount * 1000) / timeSinceLastFps);
+              fpsDisplay.innerText = `${fps} FPS`;
+              frameCount = 0;
+              lastFpsUpdate = now;
+            }
+
+            // Ограничение частоты предсказаний
+            if (now - lastPredictTime > PREDICT_INTERVAL_MS) {
+              lastPredictTime = now;
+              
+              // Запускаем детекцию
+              const predictions = await model.detect(video);
+              
+              // Отрисовка рамок и вывод списка
+              drawPredictions(predictions);
+              updateDetectionsList(predictions);
+            } else {
+              // Даже если не делаем детекцию, перерисовываем (чтобы не мигало)
+              // Но используем последние предсказания? для простоты оставим без изменений.
+              // Просто копируем видео на canvas без рамок (рамки хранятся отдельно)
+              // Чтобы рамки не пропадали, мы могли бы хранить lastPredictions, но 
+              // для плавности не будем усложнять — просто если нет новых, рамки исчезают через 150мс.
+              // Это нормально для киберпанк эстетики (глитч эффект)
+            }
+            
+            // В любом случае копируем видео (зеркалим, т.к. canvas уже зеркален стилями)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            // Так как video и canvas оба зеркалятся через CSS, не нужно дополнительно трансформировать
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            
+          }
+        } catch (e) {
+          console.warn('Ошибка детекции:', e);
+        }
+        
+        // Продолжаем цикл
+        animationFrame = requestAnimationFrame(predictLoop);
+      }
+
+      animationFrame = requestAnimationFrame(detectionStep);
+    }
+
+    // --- Отрисовка рамок (киберпанк стиль) ---
+    function drawPredictions(predictions) {
+      // ctx уже содержит кадр видео
+      ctx.save();
+      // Шрифт для подписей
+      ctx.font = 'bold 16px "Share Tech Mono", "Courier New", monospace';
+      ctx.textBaseline = 'top';
+      ctx.lineWidth = 3;
+      
+      predictions.forEach(pred => {
+        const [x, y, width, height] = pred.bbox;
+        
+        // Неоновая рамка
+        ctx.strokeStyle = '#ff00ff';
+        ctx.shadowColor = '#ff00ff';
+        ctx.shadowBlur = 15;
+        ctx.strokeRect(x, y, width, height);
+        
+        // Дополнительная тонкая рамка
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x-1, y-1, width+2, height+2);
+        
+        // Подпись класса и уверенности
+        const label = `${pred.class} ${Math.round(pred.score * 100)}%`;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#00ffff';
+        ctx.fillStyle = '#0c0b16ee';
+        ctx.fillRect(x, y - 28, ctx.measureText(label).width + 16, 28);
+        
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#00ffff';
+        ctx.font = 'bold 14px "Share Tech Mono", monospace';
+        ctx.fillText(label, x + 8, y - 22);
+        
+        // Сброс теней для других элементов
+        ctx.shadowBlur = 0;
+      });
+      ctx.restore();
+    }
+
+    // --- Обновление списка объектов ---
+    function updateDetectionsList(predictions) {
+      if (!predictions || predictions.length === 0) {
+        detectionsList.innerHTML = `<li class="empty-message"><i class="fas fa-search"></i> Объекты не найдены...</li>`;
+        return;
+      }
+      
+      // Сортируем по уверенности
+      const sorted = [...predictions].sort((a, b) => b.score - a.score);
+      
+      let html = '';
+      sorted.slice(0, 10).forEach(pred => { // показываем до 10 объектов
+        const icon = getIconForClass(pred.class);
+        html += `<li class="detection-item">
+                  <i class="${icon}"></i>
+                  <span>${pred.class}</span>
+                  <span class="confidence">${Math.round(pred.score * 100)}%</span>
+                </li>`;
+      });
+      
+      if (sorted.length > 10) {
+        html += `<li class="empty-message"><i class="fas fa-ellipsis-h"></i> и ещё ${sorted.length-10}...</li>`;
+      }
+      
+      detectionsList.innerHTML = html;
+    }
+
+    // Сопоставление классов и иконок Font Awesome
+    function getIconForClass(className) {
+      const map = {
+        'person': 'fas fa-user',
+        'bicycle': 'fas fa-bicycle',
+        'car': 'fas fa-car',
+        'motorcycle': 'fas fa-motorcycle',
+        'airplane': 'fas fa-plane',
+        'bus': 'fas fa-bus',
+        'train': 'fas fa-train',
+        'truck': 'fas fa-truck',
+        'boat': 'fas fa-ship',
+        'traffic light': 'fas fa-traffic-light',
+        'fire hydrant': 'fas fa-fire-extinguisher',
+        'stop sign': 'fas fa-stop',
+        'parking meter': 'fas fa-parking',
+        'bench': 'fas fa-chair',
+        'bird': 'fas fa-dove',
+        'cat': 'fas fa-cat',
+        'dog': 'fas fa-dog',
+        'horse': 'fas fa-horse',
+        'sheep': 'fas fa-sheep',
+        'cow': 'fas fa-cow',
+        'elephant': 'fas fa-elephant',
+        'bear': 'fas fa-paw',
+        'zebra': 'fas fa-hippo', // близко
+        'giraffe': 'fas fa-giraffe',
+        'backpack': 'fas fa-bag-shopping',
+        'umbrella': 'fas fa-umbrella',
+        'handbag': 'fas fa-bag-shopping',
+        'tie': 'fas fa-tie',
+        'suitcase': 'fas fa-suitcase',
+        'frisbee': 'fas fa-compact-disc',
+        'skis': 'fas fa-skiing',
+        'snowboard': 'fas fa-snowboarding',
+        'sports ball': 'fas fa-futbol',
+        'kite': 'fas fa-kite',
+        'baseball bat': 'fas fa-baseball-bat',
+        'baseball glove': 'fas fa-baseball',
+        'skateboard': 'fas fa-skateboard',
+        'surfboard': 'fas fa-surfboard',
+        'tennis racket': 'fas fa-table-tennis',
+        'bottle': 'fas fa-bottle-water',
+        'wine glass': 'fas fa-wine-glass',
+        'cup': 'fas fa-mug-hot',
+        'fork': 'fas fa-utensils',
+        'knife': 'fas fa-utensils',
+        'spoon': 'fas fa-spoon',
+        'bowl': 'fas fa-bowl-food',
+        'banana': 'fas fa-apple', // условно
+        'apple': 'fas fa-apple',
+        'sandwich': 'fas fa-burger',
+        'orange': 'fas fa-citrus',
+        'broccoli': 'fas fa-seedling',
+        'carrot': 'fas fa-carrot',
+        'hot dog': 'fas fa-hotdog',
+        'pizza': 'fas fa-pizza-slice',
+        'donut': 'fas fa-circle',
+        'cake': 'fas fa-cake-candles',
+        'chair': 'fas fa-chair',
+        'couch': 'fas fa-couch',
+        'potted plant': 'fas fa-leaf',
+        'bed': 'fas fa-bed',
+        'dining table': 'fas fa-table',
+        'toilet': 'fas fa-toilet',
+        'tv': 'fas fa-tv',
+        'laptop': 'fas fa-laptop',
+        'mouse': 'fas fa-computer-mouse',
+        'remote': 'fas fa-gamepad',
+        'keyboard': 'fas fa-keyboard',
+        'cell phone': 'fas fa-mobile-screen',
+        'microwave': 'fas fa-oven',
+        'oven': 'fas fa-temperature-high',
+        'toaster': 'fas fa-bread-slice',
+        'sink': 'fas fa-sink',
+        'refrigerator': 'fas fa-icicles',
+        'book': 'fas fa-book',
+        'clock': 'fas fa-clock',
+        'vase': 'fas fa-vial',
+        'scissors': 'fas fa-cut',
+        'teddy bear': 'fas fa-bear',
+        'hair drier': 'fas fa-wind',
+        'toothbrush': 'fas fa-tooth'
+      };
+      return map[className.toLowerCase()] || 'fas fa-microchip';
+    }
+
+    // --- Снимок (скриншот с рамками) ---
+    function takeSnapshot() {
+      if (!cameraActive) {
+        alert('Включите камеру (POWER ON)');
+        return;
+      }
+      // Создаём временную ссылку
+      const dataURL = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `cyber_scan_${Date.now()}.png`;
+      link.href = dataURL;
+      link.click();
+    }
+
+    // --- Переключение камеры ---
+    function toggleCamera() {
+      if (cameraActive) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    }
+
+    // --- Инициализация ---
+    async function init() {
+      await loadModel();
+      // Автозапуск камеры? лучше по кнопке, но можно и сразу
+      // Для удобства сразу запустим камеру
+      startCamera();
+      
+      // Навешиваем обработчики
+      toggleBtn.addEventListener('click', toggleCamera);
+      captureBtn.addEventListener('click', takeSnapshot);
+    }
+
+    init().catch(e => console.error(e));
+
+    // Обработка изменения ориентации — canvas размер подстроится
+    window.addEventListener('resize', () => {
+      if (cameraActive && video.videoWidth) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        isCameraActive = true;
-        updateCameraUI(true);
-        if (isModelReady) detectBtn.disabled = false;
-        return true;
-      } catch (e) {
-        alert('[!] OPTICS ACCESS DENIED');
-        return false;
       }
-    }
+    });
 
-    // КРАСНАЯ КИБЕРПАНК ОБВОДКА
-    async function detectFrame() {
-      if (!isCameraActive || !model || !video.videoWidth) return;
-      if (isDetecting) return;
-      isDetecting = true;
-      
-      try {
-        const predictions = await model.detect(video);
-        lastDetections = predictions;
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Настройка стиля КРАСНЫЙ КИБЕРПАНК
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = '#ff0000';
-        ctx.lineWidth = 4;
-        ctx.font = 'bold 16px "Rajdhani", monospace';
-        ctx.textBaseline = 'top';
-        
-        for (let p of predictions) {
-          const [x, y, w, h] = p.bbox;
-          
-          // Внешняя красная рамка
-          ctx.strokeStyle = '#ff0000';
-          ctx.shadowColor = '#ff0000';
-          ctx.lineWidth = 5;
-          ctx.strokeRect(x, y, w, h);
-          
-          // Внутренняя желтая рамка (как в игре)
-          ctx.strokeStyle = '#ffcc00';
-          ctx.shadowColor = '#ffcc00';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x-2, y-2, w+4, h+4);
-          
-          // Угловые акценты
-          ctx.shadowBlur = 20;
-          ctx.shadowColor = '#ff0000';
-          ctx.beginPath();
-          ctx.moveTo(x, y+15); ctx.lineTo(x, y); ctx.lineTo(x+15, y);
-          ctx.strokeStyle = '#ff0000';
-          ctx.lineWidth = 4;
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(x+w-15, y); ctx.lineTo(x+w, y); ctx.lineTo(x+w, y+15);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(x, y+h-15); ctx.lineTo(x, y+h); ctx.lineTo(x+15, y+h);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(x+w-15, y+h); ctx.lineTo(x+w, y+h); ctx.lineTo(x+w, y+h-15);
-          ctx.stroke();
-          
-          // Подложка текста
-          ctx.shadowBlur = 15;
-          ctx.fillStyle = '#0a0000';
-          ctx.globalAlpha = 0.9;
-          const label = `◈ ${p.class} ${Math.round(p.score*100)}%`;
-          const textW = ctx.measureText(label).width + 24;
-          ctx.fillRect(x, y-38, textW, 32);
-          ctx.globalAlpha = 1.0;
-          
-          // Текст
-          ctx.fillStyle = '#ffcc00';
-          ctx.shadowColor = '#ff0000';
-          ctx.font = 'bold 15px "Rajdhani", sans-serif';
-          ctx.fillText(label, x+12, y-32);
-        }
-        
-        ctx.shadowBlur = 0;
-        updateTerminal(predictions);
-        
-      } catch (e) { 
-        console.warn('Scan error:', e); 
-      } finally { 
-        isDetecting = false; 
-      }
-    }
-
-    function startScan() {
-      if (!isCameraActive) { 
-        alert('[!] POWER ON OPTICS FIRST'); 
-        return; 
-      }
-      if (!model) { 
-        alert('[!] NEURAL NET OFFLINE'); 
-        return; 
-      }
-      stopDetectionLoop();
-      detectFrame();
-      detectionInterval = setInterval(() => detectFrame(), 150);
-    }
-
-    async function toggleCamera() {
-      if (isCameraActive) { 
-        stopCamera(); 
-        stopDetectionLoop(); 
-      } else { 
-        if (!isModelReady) { 
-          alert('NEURAL LINK ESTABLISHING...'); 
-          return; 
-        }
-        await startCamera(); 
-      }
-    }
-
-    async function loadModel() {
-      try {
-        model = await cocoSsd.load({ base: 'mobilenet_v2' });
-        setModelReady(true);
-        if (isCameraActive) detectBtn.disabled = false;
-      } catch (err) {
-        bootScreen.innerHTML = '<div style="color:#ff0000">LINK FAILURE</div>';
-        console.error(err);
-      }
-    }
-
-    function bindEvents() {
-      toggleCamBtn.addEventListener('click', toggleCamera);
-      detectBtn.addEventListener('click', startScan);
-      window.addEventListener('resize', () => {
-        if (isCameraActive && video.videoWidth) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-        }
-      });
-    }
-
-    function init() {
-      bindEvents();
-      loadModel();
-      detectBtn.disabled = true;
-      updateCameraUI(false);
-    }
-    
-    init();
   })();
 </script>
 </body>
