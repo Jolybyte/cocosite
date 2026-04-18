@@ -3,621 +3,561 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>CyberVision | Объекты в реальном времени</title>
-    <!-- Иконки из фреймворка (Font Awesome 6 Free) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- TensorFlow.js и модель COCO-SSD (мощная, готовая детекция объектов) -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+    <title>Object Detection | Веб-камера</title>
+    <!-- Загрузка TensorFlow.js и модели COCO-SSD (мощная, предобученная на 80+ классах) -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            user-select: none; /* улучшает тактильный опыт, но текст копировать можно */
+            user-select: none; /* легкое улучшение на мобилках, не мешает */
         }
 
         body {
-            background: radial-gradient(circle at 20% 30%, #0a0f1a, #010101);
-            font-family: 'Segoe UI', 'Orbitron', 'Courier New', monospace;
+            background: #0a0a0a;
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 16px;
+            font-family: system-ui, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            padding: 12px;
         }
 
-        /* Киберпанк-минимализм: неон, сетка, тонкие рамки */
-        .cyber-container {
-            max-width: 800px;
+        /* Минималистичный контейнер — почти без теней, только необходимые отступы */
+        .app-container {
+            max-width: 700px;
             width: 100%;
             margin: 0 auto;
-            background: rgba(8, 12, 25, 0.65);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(0, 255, 255, 0.35);
-            border-radius: 32px;
-            box-shadow: 0 0 25px rgba(0, 255, 255, 0.2), inset 0 0 15px rgba(0, 255, 255, 0.05);
-            padding: 20px 18px 28px;
+            background: #000000;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+        }
+
+        /* Верхняя строка: только название и индикатор статуса */
+        .header {
+            padding: 16px 20px;
+            background: #000;
+            border-bottom: 1px solid #1f1f1f;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .title {
+            color: #fff;
+            font-weight: 500;
+            font-size: 1.35rem;
+            letter-spacing: -0.3px;
+            background: none;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            background: #1a1a1a;
+            padding: 6px 12px;
+            border-radius: 40px;
+            color: #aaa;
+            font-weight: 450;
             transition: all 0.2s ease;
         }
 
-        /* Заголовок с глитч-эффектом */
-        .header {
-            display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-            border-bottom: 1px solid cyan;
-            padding-bottom: 12px;
-        }
-        .title {
-            font-size: 1.8rem;
-            font-weight: 600;
-            letter-spacing: 3px;
-            background: linear-gradient(135deg, #0ff, #f0f);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            text-shadow: 0 0 5px #0ff8;
-        }
-        .badge {
-            background: #000000aa;
-            border: 1px solid #0ff;
-            border-radius: 60px;
-            padding: 6px 14px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            color: #0ff;
-            font-family: monospace;
-            backdrop-filter: blur(4px);
-        }
-        .badge i {
-            margin-right: 6px;
-            font-size: 0.75rem;
+        .status-badge.active {
+            background: #1f3b2c;
+            color: #6feb9a;
+            box-shadow: 0 0 0 1px #2a6e46;
         }
 
-        /* зона вебки */
-        .camera-area {
+        /* Видео-контейнер с камерой */
+        .camera-wrapper {
             position: relative;
+            background: #000;
             width: 100%;
-            border-radius: 24px;
+            aspect-ratio: 4 / 3; /* классическое соотношение, подходит для вебки */
             overflow: hidden;
-            margin-bottom: 20px;
-            border: 2px solid rgba(0, 255, 255, 0.6);
-            box-shadow: 0 0 0 2px #000, 0 0 0 5px rgba(0, 255, 255, 0.3);
-            background: #000000;
         }
-        video, canvas {
+
+        video {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            display: block;
-        }
-        video {
-            z-index: 1;
-            filter: brightness(1.02) contrast(1.05);
-        }
-        canvas {
-            z-index: 2;
-        }
-        .camera-placeholder {
-            width: 100%;
-            aspect-ratio: 4 / 3;
-            background: repeating-linear-gradient(45deg, #0a0f1a 0px, #0a0f1a 20px, #11161f 20px, #11161f 40px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: cyan;
-            font-size: 1rem;
-            gap: 12px;
-            text-align: center;
-        }
-        .camera-placeholder i {
-            font-size: 3rem;
-            opacity: 0.7;
+            transform: scaleX(-1); /* Зеркальное отображение для естественного ощущения (как в зеркале) */
         }
 
-        /* панель управления и инфо */
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 14px;
-            justify-content: center;
-            margin-top: 16px;
-            margin-bottom: 20px;
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none; /* чтобы не блокировать доступ к жестам на мобилках */
         }
-        .cyber-btn {
-            background: rgba(0, 20, 30, 0.8);
-            border: 1.5px solid #0ff;
-            color: #0ff;
-            padding: 10px 20px;
-            border-radius: 48px;
-            font-family: monospace;
-            font-weight: bold;
-            font-size: 1rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            transition: 0.2s;
-            backdrop-filter: blur(5px);
-            letter-spacing: 1px;
-        }
-        .cyber-btn i {
-            font-size: 1.2rem;
-        }
-        .cyber-btn:active {
-            transform: scale(0.96);
-            background: #0ff22a20;
-            box-shadow: 0 0 12px cyan;
-        }
-        .cyber-btn.disabled {
-            opacity: 0.4;
-            pointer-events: none;
-            border-color: gray;
-        }
-        .status-panel {
-            background: #03060eaa;
-            border-left: 6px solid #0ff;
-            padding: 12px 16px;
-            border-radius: 20px;
-            margin-bottom: 16px;
-            font-size: 0.85rem;
-            font-family: 'Courier New', monospace;
-            color: #b0f0ff;
+
+        /* Минималистичная информационная панель */
+        .info-panel {
+            padding: 14px 20px;
+            background: #000;
+            border-top: 1px solid #1f1f1f;
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #b0b0b0;
             flex-wrap: wrap;
             gap: 12px;
         }
-        .fps-counter, .obj-count {
-            background: #00000066;
-            padding: 4px 12px;
-            border-radius: 30px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+
+        .counter {
+            background: #111;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-weight: 500;
+            letter-spacing: 0.3px;
         }
-        .detection-list {
-            background: rgba(0, 0, 0, 0.65);
-            border-radius: 24px;
-            padding: 12px 16px;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid cyan;
-            box-shadow: inset 0 0 5px #0ff1, 0 4px 10px #000;
-        }
-        .detection-list h4 {
-            color: #0ff;
-            font-size: 0.8rem;
-            letter-spacing: 2px;
-            margin-bottom: 10px;
+
+        .model-status {
+            font-size: 0.7rem;
+            opacity: 0.7;
             display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-        .list-items {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .detect-tag {
-            background: #000b10;
-            border: 1px solid #0ff;
-            border-radius: 36px;
-            padding: 6px 14px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            color: #0ff;
-            display: inline-flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 8px;
+            background-color: #3a3a3a;
+            display: inline-block;
+        }
+
+        .dot.loaded {
+            background-color: #6feb9a;
+            box-shadow: 0 0 4px #6feb9a;
+        }
+
+        /* Кнопка для инициации камеры (минималистичная) */
+        .btn-cam {
+            background: #ffffff10;
             backdrop-filter: blur(2px);
-            transition: 0.1s linear;
-            font-family: monospace;
+            border: 1px solid #2c2c2c;
+            padding: 8px 16px;
+            border-radius: 60px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
         }
-        .detect-tag i {
-            font-size: 0.75rem;
-            color: #f0f;
+
+        .btn-cam:active {
+            background: #2a2a2a;
+            transform: scale(0.97);
         }
-        .confidence {
-            color: #f0a6ff;
-            font-size: 0.7rem;
-        }
-        .footer-note {
-            text-align: center;
-            font-size: 0.65rem;
-            margin-top: 18px;
-            color: cyan;
-            opacity: 0.6;
-        }
-        @media (max-width: 600px) {
-            .cyber-container {
-                padding: 14px;
+
+        /* Для мобильной адаптации: текст чуть меньше, кнопка удобная */
+        @media (max-width: 550px) {
+            .header {
+                padding: 12px 16px;
             }
             .title {
-                font-size: 1.3rem;
+                font-size: 1.2rem;
             }
-            .cyber-btn {
-                padding: 8px 16px;
-                font-size: 0.8rem;
+            .info-panel {
+                padding: 12px 16px;
             }
-            .detect-tag {
-                padding: 4px 12px;
-                font-size: 0.7rem;
-            }
-            .status-panel {
-                font-size: 0.7rem;
+            .btn-cam {
+                padding: 6px 14px;
             }
         }
-        /* скролл кибер-стиль */
-        .detection-list::-webkit-scrollbar {
-            width: 5px;
-        }
-        .detection-list::-webkit-scrollbar-track {
-            background: #0a0f1a;
-        }
-        .detection-list::-webkit-scrollbar-thumb {
-            background: cyan;
-            border-radius: 10px;
+
+        /* Сообщение если камера не разрешена или ошибка */
+        .error-message {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(8px);
+            padding: 8px 12px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            color: #ffb3b3;
+            text-align: center;
+            z-index: 20;
+            pointer-events: none;
+            font-weight: 450;
+            border-left: 3px solid #ff5e5e;
         }
     </style>
 </head>
 <body>
 
-<div class="cyber-container">
+<div class="app-container">
     <div class="header">
-        <div class="title">
-            <i class="fas fa-microchip"></i> CYBER·VISION
-        </div>
-        <div class="badge">
-            <i class="fas fa-brain"></i> COCO-SSD v1.1
-        </div>
+        <div class="title">🔍 detect</div>
+        <div class="status-badge" id="camStatus">⏻ камера неактивна</div>
     </div>
 
-    <div class="camera-area" id="cameraWrapper">
-        <div id="placeholder" class="camera-placeholder">
-            <i class="fas fa-camera-retro"></i>
-            <span>Ожидание доступа к камере</span>
-            <i class="fas fa-arrow-down"></i>
+    <div class="camera-wrapper">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="detectionCanvas"></canvas>
+    </div>
+
+    <div class="info-panel">
+        <div class="counter">
+            🧩 объекты: <span id="objectCount">0</span>
         </div>
-        <video id="webcam" autoplay playsinline muted style="display: none;"></video>
-        <canvas id="overlayCanvas" style="display: none;"></canvas>
-    </div>
-
-    <div class="controls">
-        <button id="startBtn" class="cyber-btn"><i class="fas fa-play-circle"></i> Активировать</button>
-        <button id="stopBtn" class="cyber-btn disabled"><i class="fas fa-stop-circle"></i> Деактивировать</button>
-    </div>
-
-    <div class="status-panel">
-        <div class="fps-counter"><i class="fas fa-tachometer-alt"></i> <span id="fpsValue">--</span> FPS</div>
-        <div class="obj-count"><i class="fas fa-cubes"></i> Объектов: <span id="objectCount">0</span></div>
-        <div><i class="fas fa-eye"></i> Модель: <span id="modelStatus">загрузка...</span></div>
-    </div>
-
-    <div class="detection-list">
-        <h4><i class="fas fa-list-ul"></i> РАСПОЗНАННЫЕ ОБЪЕКТЫ</h4>
-        <div id="detectionsContainer" class="list-items">
-            <div class="detect-tag" style="opacity:0.6;"><i class="fas fa-dot-circle"></i> Ожидание детекции...</div>
+        <div class="model-status">
+            <span class="dot" id="modelDot"></span>
+            <span id="modelLabel">загрузка модели...</span>
         </div>
-    </div>
-    <div class="footer-note">
-        <i class="fas fa-shield-alt"></i> Мощная модель COCO-SSD | 90 классов | Киберпанк-аналитика
+        <button id="enableCamBtn" class="btn-cam">🎥 включить камеру</button>
     </div>
 </div>
 
 <script>
-    // ---------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------
-    let model = null;           // загруженная coco-ssd модель
-    let isModelReady = false;
-    let isStreaming = false;
-    let stream = null;
-    let animationId = null;
-    let lastTimestamp = 0;
-    let frameCount = 0;
-    let fps = 0;
-    
-    // DOM элементы
-    const video = document.getElementById('webcam');
-    const canvas = document.getElementById('overlayCanvas');
-    const ctx = canvas.getContext('2d');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const placeholderDiv = document.getElementById('placeholder');
-    const cameraWrapper = document.getElementById('cameraWrapper');
-    const fpsSpan = document.getElementById('fpsValue');
-    const objectCountSpan = document.getElementById('objectCount');
-    const modelStatusSpan = document.getElementById('modelStatus');
-    const detectionsContainer = document.getElementById('detectionsContainer');
-    
-    // размеры канваса (подстраивается под видео)
-    function resizeCanvasToVideo() {
-        if (video.videoWidth && video.videoHeight) {
-            const w = video.videoWidth;
-            const h = video.videoHeight;
-            canvas.width = w;
-            canvas.height = h;
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
-            // синхронизируем абсолютное позиционирование, размеры через css aspect уже заданы
-        }
-    }
-    
-    // Загрузка модели COCO-SSD (мощная нейронная сеть для детекции 80+ классов)
-    async function loadModel() {
-        modelStatusSpan.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> загрузка...';
-        try {
-            // COCO-SSD от TensorFlow - одна из самых мощных моделей для браузера
-            model = await cocoSsd.load({
-                base: 'mobilenet_v2',  // версия с хорошим балансом скорость/точность (но мощная)
-                modelUrl: undefined
-            });
-            isModelReady = true;
-            modelStatusSpan.innerHTML = '<i class="fas fa-check-circle"></i> активна (COCO)';
-            console.log('Модель COCO-SSD загружена');
-        } catch (err) {
-            console.error('Ошибка загрузки модели:', err);
-            modelStatusSpan.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ошибка модели';
-            isModelReady = false;
-        }
-    }
-    
-    // Функция детекции и отрисовки рамок
-    async function detectAndDraw() {
-        if (!isStreaming || !model || !video.videoWidth || video.paused || video.ended) {
-            return;
-        }
+    (async function() {
+        // ----- Элементы DOM -----
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('detectionCanvas');
+        const ctx = canvas.getContext('2d');
+        const camStatusSpan = document.getElementById('camStatus');
+        const objectCountSpan = document.getElementById('objectCount');
+        const modelDot = document.getElementById('modelDot');
+        const modelLabelSpan = document.getElementById('modelLabel');
+        const enableBtn = document.getElementById('enableCamBtn');
         
-        try {
-            // Выполняем детекцию объектов на текущем кадре
-            const predictions = await model.detect(video);
-            
-            // Обновляем счетчик объектов
-            const objCount = predictions.length;
-            objectCountSpan.innerText = objCount;
-            
-            // Очищаем канвас перед рисованием
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Рисуем кибер-рамки вокруг объектов
-            predictions.forEach(pred => {
-                const [x, y, width, height] = pred.bbox;
-                const className = pred.class;
-                const score = Math.round(pred.score * 100);
-                
-                // Стиль киберпанк: неоновые обводки, углы, текст
-                ctx.strokeStyle = '#0ff';
-                ctx.lineWidth = 2.5;
-                ctx.shadowBlur = 0;
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-                ctx.strokeRect(x, y, width, height);
-                
-                // Добавляем "лазерные" углы
-                ctx.beginPath();
-                ctx.moveTo(x, y + 8);
-                ctx.lineTo(x, y);
-                ctx.lineTo(x + 8, y);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x + width - 8, y);
-                ctx.lineTo(x + width, y);
-                ctx.lineTo(x + width, y + 8);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x + width, y + height - 8);
-                ctx.lineTo(x + width, y + height);
-                ctx.lineTo(x + width - 8, y + height);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x + 8, y + height);
-                ctx.lineTo(x, y + height);
-                ctx.lineTo(x, y + height - 8);
-                ctx.stroke();
-                
-                // Фон для текста
-                ctx.font = 'bold 16px "Courier New", monospace';
-                const textWidth = ctx.measureText(`${className} ${score}%`).width;
-                ctx.fillStyle = '#000000aa';
-                ctx.fillRect(x, y - 24, textWidth + 12, 22);
-                ctx.fillStyle = '#0ff';
-                ctx.font = 'bold 14px monospace';
-                ctx.shadowBlur = 0;
-                ctx.fillText(`${className} ${score}%`, x + 4, y - 8);
-                
-                // дополнительный неоновый глитч-эффект (точки)
-                ctx.fillStyle = '#f0f';
-                ctx.font = 'bold 10px monospace';
-                ctx.fillText(`⚡`, x + width - 12, y + height - 4);
-            });
-            
-            // Обновляем список объектов в UI (киберпанк список)
-            updateDetectionList(predictions);
-            
-        } catch (err) {
-            console.warn("Ошибка детекции:", err);
-        }
-    }
-    
-    // Обновление блока со списком объектов (иконки фреймворка)
-    function updateDetectionList(predictions) {
-        if (!detectionsContainer) return;
-        if (!predictions || predictions.length === 0) {
-            detectionsContainer.innerHTML = `<div class="detect-tag" style="opacity:0.6;"><i class="fas fa-ghost"></i> Нет объектов</div>`;
-            return;
-        }
-        // Создаем уникальные элементы для каждого обнаруженного объекта (макс 15 для читаемости)
-        const items = predictions.slice(0, 15).map(pred => {
-            const confidencePercent = Math.round(pred.score * 100);
-            let icon = 'fa-question-circle';
-            // подбираем иконку на основе класса для атмосферы
-            const cls = pred.class.toLowerCase();
-            if (cls.includes('person')) icon = 'fa-user-astronaut';
-            else if (cls.includes('cell phone') || cls.includes('phone')) icon = 'fa-mobile-alt';
-            else if (cls.includes('laptop') || cls.includes('computer')) icon = 'fa-laptop-code';
-            else if (cls.includes('tv')) icon = 'fa-tv';
-            else if (cls.includes('car')) icon = 'fa-car-side';
-            else if (cls.includes('bicycle')) icon = 'fa-bicycle';
-            else if (cls.includes('dog')) icon = 'fa-dog';
-            else if (cls.includes('cat')) icon = 'fa-cat';
-            else if (cls.includes('bottle')) icon = 'fa-wine-bottle';
-            else if (cls.includes('chair')) icon = 'fa-chair';
-            else if (cls.includes('book')) icon = 'fa-book';
-            else icon = 'fa-microchip';
-            
-            return `<div class="detect-tag"><i class="fas ${icon}"></i> ${pred.class} <span class="confidence">${confidencePercent}%</span></div>`;
-        }).join('');
-        detectionsContainer.innerHTML = items;
-    }
-    
-    // Цикл анимации (запрос кадров)
-    function renderLoop(timestamp) {
-        if (!isStreaming) return;
+        // ----- Глобальные переменные -----
+        let model = null;           // модель coco-ssd
+        let isModelLoading = true;
+        let detectionInterval = null; // интервал обнаружения
+        let stream = null;           // медиапоток камеры
+        let isCameraActive = false;
+        let animationFrameId = null;   // для requestAnimationFrame (если потребуется доп. синхронизация, но интервал проще)
+        let lastDetectionTime = 0;
+        const DETECTION_FPS = 12;      // ~12 кадров в секунду для производительности и батареи (но достаточно быстро)
+        const DETECTION_INTERVAL_MS = 1000 / DETECTION_FPS;
         
-        // расчет FPS
-        frameCount++;
-        if (timestamp - lastTimestamp >= 1000) {
-            fps = frameCount;
-            fpsSpan.innerText = fps;
-            frameCount = 0;
-            lastTimestamp = timestamp;
-        }
-        
-        // если видео готово и модель активна — выполняем детекцию
-        if (video.readyState === 4 && isModelReady && model && video.videoWidth > 0) {
-            // для производительности на мобильных устройствах throttle не требуется, но coco-ssd достаточно быстра
-            detectAndDraw();
-        } else if (video.readyState < 2) {
-            // ничего
-        }
-        
-        animationId = requestAnimationFrame(renderLoop);
-    }
-    
-    // Запуск камеры и инициализация
-    async function startCamera() {
-        if (isStreaming) {
-            // уже активно
-            return;
-        }
-        if (!isModelReady) {
-            alert("Модель ещё не загружена, подождите секунду...");
-            return;
-        }
-        
-        try {
-            // Запрашиваем доступ к веб-камере (с поддержкой мобильных)
-            const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
-            });
-            stream = mediaStream;
-            video.srcObject = stream;
-            video.style.display = 'block';
-            canvas.style.display = 'block';
-            placeholderDiv.style.display = 'none';
-            await video.play();
-            isStreaming = true;
-            
-            // После того как видео начало играть, подстраиваем размер канваса
-            video.addEventListener('loadedmetadata', () => {
-                resizeCanvasToVideo();
-            });
-            resizeCanvasToVideo(); // дополнительно
-            
-            // Обновляем UI кнопок
-            startBtn.classList.add('disabled');
-            stopBtn.classList.remove('disabled');
-            
-            // запускаем цикл детекции если ещё не запущен
-            if (animationId === null) {
-                lastTimestamp = performance.now();
-                frameCount = 0;
-                animationId = requestAnimationFrame(renderLoop);
+        // ---- Настройка canvas под размеры видео ----
+        function resizeCanvasToVideo() {
+            if (video.videoWidth && video.videoHeight) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.style.width = `${video.videoWidth}px`;
+                canvas.style.height = `${video.videoHeight}px`;
+                // Синхронизация размера через CSS wrapper уже позаботится о масштабировании,
+                // но абсолютные координаты будут рисоваться в координатах canvas (родное разрешение видео)
+            } else {
+                // fallback: размеры контейнера
+                const container = canvas.parentElement;
+                const rect = container.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
             }
-        } catch (err) {
-            console.error("Ошибка доступа к камере:", err);
-            alert("Не удалось получить доступ к камере. Проверьте разрешения.\n" + (err.message || ""));
-            // возвращаем интерфейс в исходное состояние
-            video.style.display = 'none';
-            canvas.style.display = 'none';
-            placeholderDiv.style.display = 'flex';
-            startBtn.classList.remove('disabled');
-            stopBtn.classList.add('disabled');
-            isStreaming = false;
         }
-    }
-    
-    // Остановка камеры и очистка
-    function stopCamera() {
-        if (!isStreaming) return;
         
-        // остановить все треки
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
+        // ----- Загрузка мощной модели COCO-SSD (MobileNet V2 based) -----
+        async function loadDetectionModel() {
+            try {
+                modelLabelSpan.innerText = 'загрузка COCO-SSD...';
+                modelDot.className = 'dot';
+                // tf.js бэкенд WebGL ускорит инференс
+                await tf.setBackend('webgl');
+                await tf.ready();
+                // загрузка модели (предобучена на 80 категориях, высокая точность)
+                model = await cocoSsd.load({ 
+                    base: 'mobilenet_v2',  // мощный баланс скорость/точность
+                    modelUrl: undefined     // стандартный url
+                });
+                isModelLoading = false;
+                modelLabelSpan.innerText = 'модель активна (80 классов)';
+                modelDot.className = 'dot loaded';
+                console.log('✅ Модель COCO-SSD загружена');
+                // если камера уже запущена — начинаем детекцию
+                if (isCameraActive && video.videoWidth > 0) {
+                    startDetectionLoop();
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки модели:', err);
+                modelLabelSpan.innerText = 'ошибка модели';
+                modelDot.className = 'dot';
+                modelDot.style.backgroundColor = '#e34d4d';
+            }
         }
-        video.srcObject = null;
-        video.style.display = 'none';
-        canvas.style.display = 'none';
-        placeholderDiv.style.display = 'flex';
-        isStreaming = false;
         
-        // очищаем канвас
-        if (ctx) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // ----- Функция детекции и отрисовки (красная обводка + текст) -----
+        async function detectAndDraw() {
+            if (!model || !isCameraActive || !video.videoWidth || !video.videoHeight) {
+                // Если камера не готова - очищаем canvas
+                if (ctx && canvas.width && canvas.height) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+                return;
+            }
+            
+            try {
+                // Делаем предсказание на текущем кадре видео
+                const predictions = await model.detect(video);
+                // Обновляем счетчик объектов
+                const count = predictions.length;
+                objectCountSpan.innerText = count;
+                
+                // Рисуем на canvas
+                if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                    // синхронизация размеров canvas под исходное видео (важно для координат)
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.style.width = `${video.videoWidth}px`;
+                    canvas.style.height = `${video.videoHeight}px`;
+                }
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Проходим по всем обнаруженным объектам и рисуем красную обводку + текст
+                for (let pred of predictions) {
+                    const [x, y, width, height] = pred.bbox;
+                    const label = pred.class;
+                    const score = Math.round(pred.score * 100);
+                    const displayText = `${label} ${score}%`;
+                    
+                    // Рисуем прямоугольник: красная обводка, толщина 2px, без заливки
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#ff2a2a';
+                    ctx.lineWidth = Math.max(2, Math.min(4, canvas.width / 200)); // адаптивная толщина
+                    ctx.setLineDash([]); // сплошная
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // Дополнительный контрастный фон под текст (полупрозрачный черный)
+                    ctx.font = `bold ${Math.max(14, canvas.width / 35)}px "SF Mono", "Monaco", monospace`;
+                    const textMetrics = ctx.measureText(displayText);
+                    const textWidth = textMetrics.width;
+                    const textHeight = parseInt(ctx.font, 10) * 0.8;
+                    const paddingX = 6;
+                    const paddingY = 4;
+                    
+                    // Позиция текста над прямоугольником или внутри верхнего края
+                    let textX = x;
+                    let textY = y - 6;
+                    let bgY = y - textHeight - paddingY * 1.5;
+                    // если текст выходит за верхнюю границу, рисуем внутри снизу от рамки
+                    if (textY < 0) {
+                        textY = y + height + textHeight + 2;
+                        bgY = y + height + 2;
+                    }
+                    
+                    // Фон для текста (полупрозрачный черный с легким скруглением)
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(textX - 2, bgY - 2, textWidth + paddingX, textHeight + paddingY);
+                    
+                    // Сам текст белым, жирный, четкий
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowBlur = 0;
+                    ctx.fillText(displayText, textX, textY + textHeight - 2);
+                    
+                    // дополнительно можно добавить красный акцентный бордер вокруг текста — опционально
+                    ctx.strokeStyle = '#ff4d4d';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(textX - 2, bgY - 2, textWidth + paddingX, textHeight + paddingY);
+                }
+                
+                // Если нет объектов, можно оставить canvas пустым (минимализм)
+                if (count === 0 && canvas.width > 0) {
+                    // Ничего не рисуем дополнительно, просто прозрачный фон, только рамок нет
+                }
+            } catch (err) {
+                console.warn('Ошибка детекции:', err);
+                // Не сбрасываем поток, но показываем на canvas что ошибка? нет, просто лог.
+            }
         }
-        // сброс списка объектов
-        detectionsContainer.innerHTML = `<div class="detect-tag" style="opacity:0.6;"><i class="fas fa-dot-circle"></i> Ожидание детекции...</div>`;
-        objectCountSpan.innerText = '0';
-        fpsSpan.innerText = '--';
         
-        // обновляем кнопки
-        startBtn.classList.remove('disabled');
-        stopBtn.classList.add('disabled');
-    }
-    
-    // Полная остановка цикла при отключении, перестраховка
-    function fullStop() {
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
+        // ----- Цикл детекции (интервальный) -----
+        function startDetectionLoop() {
+            if (detectionInterval) clearInterval(detectionInterval);
+            // Сразу выполняем первое обнаружение
+            if (video.readyState >= 2) {
+                detectAndDraw();
+            }
+            detectionInterval = setInterval(() => {
+                if (isCameraActive && model && video.readyState === 4 && video.videoWidth > 0) {
+                    detectAndDraw();
+                } else if (!isCameraActive) {
+                    // если камера выключена, чистим canvas и счетчик
+                    if (ctx && canvas.width) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    objectCountSpan.innerText = '0';
+                }
+            }, DETECTION_INTERVAL_MS);
         }
-        stopCamera();
-    }
-    
-    // Инициализация при загрузке страницы: загружаем модель, слушатели
-    async function init() {
-        await loadModel();
         
-        // слушатели кнопок
-        startBtn.addEventListener('click', startCamera);
-        stopBtn.addEventListener('click', () => {
-            if (isStreaming) stopCamera();
-        });
+        function stopDetectionLoop() {
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+            // Очищаем canvas при остановке
+            if (ctx && canvas.width) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            objectCountSpan.innerText = '0';
+        }
         
-        // дополнительно: при уходе со страницы освобождаем камеру
-        window.addEventListener('beforeunload', () => {
+        // ----- Включение камеры (с обработкой разрешений) -----
+        async function enableCamera() {
             if (stream) {
-                stream.getTracks().forEach(t => t.stop());
+                // Если камера уже активна, перезапускаем (на случай ошибок)
+                disableCamera();
             }
-            if (animationId) cancelAnimationFrame(animationId);
-        });
+            
+            try {
+                // Запрашиваем доступ к веб-камере (идеально для мобильных: используем заднюю/фронтальную по умолчанию)
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: "environment" }, // на мобилках предпочтительнее основная камера, но если нет — любой режим
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                // Но для фронталки чаще лучше "user", но у нас зеркалирование через scaleX, поэтому не страшно
+                // Попробуем с расширенными настройками.
+                const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                stream = newStream;
+                video.srcObject = stream;
+                await video.play();
+                isCameraActive = true;
+                camStatusSpan.innerText = '● камера активна';
+                camStatusSpan.classList.add('active');
+                
+                // Ждём когда видео получит метаданные для размера canvas
+                video.addEventListener('loadedmetadata', () => {
+                    resizeCanvasToVideo();
+                    if (model && !isModelLoading) {
+                        startDetectionLoop();
+                    } else if (model) {
+                        // модель уже готова, начинаем
+                        startDetectionLoop();
+                    } else {
+                        // модель еще грузится, цикл запустится когда модель загрузится (смотри loadDetectionModel)
+                    }
+                }, { once: true });
+                
+                // Если видео уже готово
+                if (video.videoWidth > 0) {
+                    resizeCanvasToVideo();
+                    if (model) startDetectionLoop();
+                }
+                
+            } catch (err) {
+                console.error('Ошибка доступа к камере:', err);
+                let errorMsg = 'Не удалось получить доступ к камере. ';
+                if (err.name === 'NotAllowedError') errorMsg += 'Разрешите доступ в настройках браузера.';
+                else if (err.name === 'NotFoundError') errorMsg += 'Камера не обнаружена.';
+                else errorMsg += 'Проверьте подключение камеры.';
+                showTemporaryError(errorMsg);
+                camStatusSpan.innerText = '✖ ошибка камеры';
+                camStatusSpan.classList.remove('active');
+                isCameraActive = false;
+                stopDetectionLoop();
+            }
+        }
         
-        // автоподстройка canvas при изменении размера экрана (ресайз видео)
-        window.addEventListener('resize', () => {
-            if (video.videoWidth) {
-                resizeCanvasToVideo();
+        // ----- Выключение камеры и очистка -----
+        function disableCamera() {
+            if (stream) {
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                stream = null;
             }
-        });
-    }
-    
-    // запуск инициализации
-    init();
+            video.srcObject = null;
+            isCameraActive = false;
+            camStatusSpan.innerText = '⏻ камера выкл';
+            camStatusSpan.classList.remove('active');
+            stopDetectionLoop();
+            // очищаем canvas от рамок
+            if (ctx && canvas.width) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            objectCountSpan.innerText = '0';
+        }
+        
+        // ---- Временное сообщение об ошибке (в минималистичном стиле) ----
+        let errorTimeout = null;
+        function showTemporaryError(message) {
+            // Удаляем существующее сообщение если есть
+            const existingError = document.querySelector('.error-message');
+            if (existingError) existingError.remove();
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerText = message;
+            const wrapper = document.querySelector('.camera-wrapper');
+            wrapper.style.position = 'relative';
+            wrapper.appendChild(errorDiv);
+            if (errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => {
+                if (errorDiv && errorDiv.remove) errorDiv.remove();
+            }, 4000);
+        }
+        
+        // ----- Событие при изменении размера окна (мобильная адаптация) -----
+        function handleWindowResize() {
+            if (video.videoWidth && video.videoHeight && isCameraActive) {
+                resizeCanvasToVideo();
+                // дополнительный вызов детекции не критичен
+                if (model) detectAndDraw();
+            }
+        }
+        
+        // ----- Инициализация всего приложения -----
+        async function init() {
+            // Загружаем мощную модель сразу
+            await loadDetectionModel();
+            // При клике на кнопку - включаем камеру. Пользователь сам активирует (требование браузера)
+            enableBtn.addEventListener('click', () => {
+                if (isCameraActive) {
+                    disableCamera();
+                    enableBtn.innerText = '🎥 включить камеру';
+                } else {
+                    enableCamera();
+                    enableBtn.innerText = '📷 выключить камеру';
+                }
+            });
+            
+            // Также на случай, если камера уже была активна, но модель загрузилась позже - стартуем детекцию
+            // Проверяем в интервале ожидания готовности модели
+            const checkModelAndCam = setInterval(() => {
+                if (model && isCameraActive && video.videoWidth > 0 && !detectionInterval) {
+                    startDetectionLoop();
+                    clearInterval(checkModelAndCam);
+                } else if (model && !isCameraActive) {
+                    // модель готова, но камера выключена
+                    // ничего не делаем
+                }
+            }, 300);
+            
+            window.addEventListener('resize', () => {
+                setTimeout(handleWindowResize, 100);
+            });
+            
+            // Поддержка touch-событий, чтобы кнопка работала чётко
+            enableBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                enableBtn.click();
+            });
+        }
+        
+        // Старт приложения
+        init();
+    })();
 </script>
 </body>
 </html>
