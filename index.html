@@ -34,7 +34,6 @@
       position: relative;
     }
 
-    /* Адаптация для десктопа */
     @media (min-width: 768px) {
       body {
         padding: 20px;
@@ -49,7 +48,6 @@
       }
     }
 
-    /* Зона камеры — с поддержкой жестов */
     .camera-container {
       flex: 1;
       position: relative;
@@ -88,10 +86,9 @@
       transform-origin: 0 0;
     }
 
-    /* Индикатор зума */
     .zoom-indicator {
       position: absolute;
-      bottom: 100px;
+      bottom: 140px;
       left: 50%;
       transform: translateX(-50%);
       background: rgba(255, 255, 255, 0.9);
@@ -115,7 +112,6 @@
       opacity: 1;
     }
 
-    /* FPS счетчик (для отладки) */
     .fps-counter {
       position: absolute;
       top: 16px;
@@ -135,14 +131,22 @@
 
     /* Панель управления */
     .controls {
-      padding: 18px 22px 22px;
+      padding: 14px 16px 16px;
       background: #ffffff;
       border-top: 1px solid #eaeaea;
+      z-index: 20;
+    }
+
+    .controls-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      z-index: 20;
+      margin-bottom: 12px;
+    }
+
+    .controls-row:last-child {
+      margin-bottom: 0;
     }
 
     .status-area {
@@ -175,18 +179,18 @@
       background: #ffffff;
       border: 1px solid #e0e0e0;
       color: #1a1a1a;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 480;
-      padding: 12px 24px;
+      padding: 10px 16px;
       border-radius: 50px;
       cursor: pointer;
       transition: all 0.2s ease;
       letter-spacing: 0.3px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-      min-width: 120px;
       text-align: center;
       backdrop-filter: blur(5px);
       -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
     }
 
     button:active {
@@ -209,10 +213,42 @@
     .reset-zoom-btn {
       background: #f0f0f0;
       border: 1px solid #ddd;
-      padding: 10px 18px;
-      margin-left: 8px;
+      padding: 10px 14px;
       min-width: auto;
-      font-size: 15px;
+    }
+
+    /* Селектор разрешения */
+    .resolution-selector {
+      display: flex;
+      gap: 6px;
+      background: #f5f5f5;
+      padding: 4px;
+      border-radius: 50px;
+      flex-wrap: wrap;
+    }
+
+    .res-btn {
+      padding: 8px 14px;
+      min-width: auto;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      font-size: 13px;
+      flex: 1;
+    }
+
+    .res-btn.active {
+      background: #ffffff;
+      border: 1px solid #ddd;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      font-weight: 500;
+    }
+
+    .res-info {
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+      margin-top: 4px;
     }
 
     /* Загрузка модели */
@@ -242,25 +278,31 @@
       box-shadow: 0 8px 28px rgba(0,0,0,0.06);
     }
 
-    /* Адаптация */
     @media (max-width: 480px) {
       .controls {
-        padding: 14px 16px 18px;
+        padding: 12px 14px 14px;
       }
       button {
-        padding: 12px 18px;
-        font-size: 14px;
+        padding: 10px 14px;
+        font-size: 13px;
       }
       .hint {
         display: none;
       }
       .reset-zoom-btn {
-        padding: 10px 14px;
+        padding: 8px 12px;
       }
       .fps-counter {
         top: 12px;
         right: 12px;
         padding: 4px 10px;
+        font-size: 11px;
+      }
+      .res-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      .res-info {
         font-size: 11px;
       }
     }
@@ -282,14 +324,27 @@
   </div>
 
   <div class="controls">
-    <div class="status-area">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText">Ожидание</span>
+    <!-- Первая строка: статус и кнопки управления -->
+    <div class="controls-row">
+      <div class="status-area">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Ожидание</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span class="hint" id="objectsCount">—</span>
+        <button id="resetZoomBtn" class="reset-zoom-btn" title="Сбросить зум">⟲ 1x</button>
+        <button id="toggleCameraBtn">▶ Включить</button>
+      </div>
     </div>
-    <div style="display: flex; align-items: center; gap: 6px;">
-      <span class="hint" id="objectsCount">—</span>
-      <button id="resetZoomBtn" class="reset-zoom-btn" title="Сбросить зум">⟲ 1x</button>
-      <button id="toggleCameraBtn">▶ Включить</button>
+    
+    <!-- Вторая строка: селектор разрешения -->
+    <div class="resolution-selector" id="resolutionSelector">
+      <button class="res-btn" data-res="480">SD (480p)</button>
+      <button class="res-btn active" data-res="720">HD (720p)</button>
+      <button class="res-btn" data-res="1080">FHD (1080p)</button>
+    </div>
+    <div class="res-info" id="resInfo">
+      HD: баланс качество/производительность
     </div>
   </div>
 </div>
@@ -311,24 +366,42 @@
     const cameraContainer = document.getElementById('cameraContainer');
     const zoomIndicator = document.getElementById('zoomIndicator');
     const fpsCounter = document.getElementById('fpsCounter');
+    const resInfo = document.getElementById('resInfo');
+    const resBtns = document.querySelectorAll('.res-btn');
+
+    // ---------- Пресеты разрешений ----------
+    const RESOLUTION_PRESETS = {
+      '480': {
+        width: 640,
+        height: 480,
+        label: 'SD (480p)',
+        description: 'SD: максимальная производительность',
+        maxCanvasSize: 640
+      },
+      '720': {
+        width: 1280,
+        height: 720,
+        label: 'HD (720p)',
+        description: 'HD: баланс качество/производительность',
+        maxCanvasSize: 1280
+      },
+      '1080': {
+        width: 1920,
+        height: 1080,
+        label: 'FHD (1080p)',
+        description: 'FHD: максимальная детализация',
+        maxCanvasSize: 1920
+      }
+    };
+
+    let currentResolution = '720'; // По умолчанию
 
     // ---------- Конфигурация производительности ----------
     const CONFIG = {
-      // Детекция
-      DETECTION_INTERVAL_MS: 120,        // ~8 fps детекции
-      
-      // Отрисовка
-      MAX_RENDER_FPS: 30,                // Максимальный FPS отрисовки
-      MAX_CANVAS_WIDTH: 1280,            // Ограничение размера канваса
-      MAX_CANVAS_HEIGHT: 720,
-      
-      // Зум
+      DETECTION_INTERVAL_MS: 120,
+      MAX_RENDER_FPS: 30,
       MIN_ZOOM: 1.0,
-      MAX_ZOOM: 4.0,
-      
-      // Камера
-      VIDEO_WIDTH: { ideal: 1280 },      // Баланс качество/производительность
-      VIDEO_HEIGHT: { ideal: 720 }
+      MAX_ZOOM: 4.0
     };
 
     // ---------- Состояния ----------
@@ -339,9 +412,7 @@
     let renderFrameId = null;
     let lastDetectionTime = 0;
     let lastRenderTime = 0;
-    let isRenderScheduled = false;
     
-    // Кэшированные предсказания для отрисовки
     let lastPredictions = [];
     
     // Переменные для зума
@@ -357,18 +428,66 @@
     let fpsLastTime = performance.now();
     let currentFPS = 0;
     
-    // Флаг готовности видео
     let isVideoReady = false;
+    
+    // Кэш для размеров контейнера
+    let containerWidth = 0;
+    let containerHeight = 0;
 
-    // Настройки камеры
-    const constraints = {
-      video: {
-        facingMode: 'environment',
-        width: CONFIG.VIDEO_WIDTH,
-        height: CONFIG.VIDEO_HEIGHT
-      },
-      audio: false
-    };
+    // ---------- Селектор разрешения ----------
+    function initResolutionSelector() {
+      resBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const res = btn.dataset.res;
+          if (res === currentResolution) return;
+          
+          // Обновляем UI
+          resBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentResolution = res;
+          
+          const preset = RESOLUTION_PRESETS[res];
+          resInfo.textContent = preset.description;
+          
+          // Если камера активна, перезапускаем с новым разрешением
+          if (stream) {
+            restartCamera();
+          }
+        });
+      });
+    }
+
+    async function restartCamera() {
+      if (!stream) return;
+      
+      stopCameraAndDetection();
+      
+      // Небольшая задержка для корректного освобождения ресурсов
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      toggleBtn.disabled = true;
+      toggleBtn.textContent = '...';
+      
+      const success = await startCamera();
+      if (!success) {
+        toggleBtn.disabled = false;
+        toggleBtn.textContent = '▶ Включить';
+      } else {
+        toggleBtn.disabled = false;
+      }
+    }
+
+    function getVideoConstraints() {
+      const preset = RESOLUTION_PRESETS[currentResolution];
+      return {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: preset.width },
+          height: { ideal: preset.height }
+        },
+        audio: false
+      };
+    }
 
     // ---------- Обновление UI статуса ----------
     function setStatus(type, message) {
@@ -385,12 +504,49 @@
       }
     }
 
-    // ---------- Управление зумом (оптимизированное) ----------
+    // ---------- Корректное масштабирование канваса ----------
+    function updateCanvasSize() {
+      if (!isVideoReady || !video.videoWidth || !video.videoHeight) return;
+      
+      const containerRect = cameraContainer.getBoundingClientRect();
+      containerWidth = containerRect.width;
+      containerHeight = containerRect.height;
+      
+      const videoAspect = video.videoWidth / video.videoHeight;
+      const containerAspect = containerWidth / containerHeight;
+      
+      let canvasWidth, canvasHeight;
+      
+      // Вычисляем размеры для cover (как object-fit: cover)
+      if (videoAspect > containerAspect) {
+        // Видео шире - обрезаем по высоте
+        canvasHeight = containerHeight;
+        canvasWidth = containerHeight * videoAspect;
+      } else {
+        // Видео выше - обрезаем по ширине
+        canvasWidth = containerWidth;
+        canvasHeight = containerWidth / videoAspect;
+      }
+      
+      // Применяем размеры канваса (не больше максимального)
+      const preset = RESOLUTION_PRESETS[currentResolution];
+      const maxSize = preset.maxCanvasSize;
+      
+      // Сохраняем пропорции, но ограничиваем максимальный размер
+      const scale = Math.min(1, maxSize / Math.max(canvasWidth, canvasHeight));
+      canvas.width = Math.round(canvasWidth * scale);
+      canvas.height = Math.round(canvasHeight * scale);
+      
+      // CSS размеры остаются 100% для корректного отображения
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+    }
+
+    // ---------- Управление зумом ----------
     function applyZoom(zoomValue, originX = null, originY = null) {
       zoomValue = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.MIN_ZOOM, zoomValue));
       currentZoom = zoomValue;
       
-      // Устанавливаем точку трансформации если передана
       if (originX !== null && originY !== null) {
         transformOriginX = originX;
         transformOriginY = originY;
@@ -401,13 +557,11 @@
         canvas.style.transformOrigin = `${originXPx}px ${originYPx}px`;
       }
       
-      // Применяем трансформацию через requestAnimationFrame
       requestAnimationFrame(() => {
         video.style.transform = `scale(${currentZoom})`;
         canvas.style.transform = `scale(${currentZoom})`;
       });
       
-      // Показываем индикатор
       zoomIndicator.textContent = `🔍 ${currentZoom.toFixed(1)}x`;
       zoomIndicator.classList.add('visible');
       
@@ -420,13 +574,12 @@
     function resetZoom() {
       transformOriginX = 0.5;
       transformOriginY = 0.5;
-      const containerRect = cameraContainer.getBoundingClientRect();
       video.style.transformOrigin = 'center center';
       canvas.style.transformOrigin = 'center center';
       applyZoom(1.0);
     }
 
-    // ---------- Обработчики жестов (улучшенные) ----------
+    // ---------- Обработчики жестов ----------
     function getTouchCenter(touches) {
       const rect = cameraContainer.getBoundingClientRect();
       const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
@@ -488,7 +641,6 @@
         fpsFrameCount = 0;
         fpsLastTime = now;
         
-        // Цветовая индикация
         if (currentFPS >= 25) {
           fpsCounter.style.color = '#0f0';
         } else if (currentFPS >= 15) {
@@ -499,14 +651,12 @@
       }
     }
 
-    // ---------- Оптимизированная отрисовка ----------
+    // ---------- Оптимизированная отрисовка с корректным масштабированием ----------
     function renderVideoFrame(now) {
       if (!isDetecting || !isVideoReady) return;
       
-      // Планируем следующий кадр
       renderFrameId = requestAnimationFrame(renderVideoFrame);
       
-      // Ограничение FPS
       if (now - lastRenderTime < (1000 / CONFIG.MAX_RENDER_FPS)) {
         return;
       }
@@ -514,23 +664,43 @@
       lastRenderTime = now;
       updateFPSCounter(now);
       
-      // Вычисляем оптимальный размер канваса
-      const targetWidth = Math.min(video.videoWidth, CONFIG.MAX_CANVAS_WIDTH);
-      const targetHeight = Math.min(video.videoHeight, CONFIG.MAX_CANVAS_HEIGHT);
-      
-      // Обновляем размер канваса только при необходимости
-      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
+      // Обновляем размер канваса при изменении контейнера
+      const containerRect = cameraContainer.getBoundingClientRect();
+      if (containerRect.width !== containerWidth || containerRect.height !== containerHeight) {
+        updateCanvasSize();
       }
       
-      // Масштабируем видео при отрисовке
-      const scaleX = canvas.width / video.videoWidth;
-      const scaleY = canvas.height / video.videoHeight;
+      // Вычисляем коэффициенты масштабирования для cover
+      const videoAspect = video.videoWidth / video.videoHeight;
+      const canvasAspect = canvas.width / canvas.height;
       
-      // Очищаем и рисуем видео
+      let drawWidth, drawHeight, offsetX, offsetY;
+      
+      if (videoAspect > canvasAspect) {
+        // Видео шире канваса - обрезаем по горизонтали
+        drawHeight = video.videoHeight;
+        drawWidth = video.videoHeight * canvasAspect;
+        offsetX = (video.videoWidth - drawWidth) / 2;
+        offsetY = 0;
+      } else {
+        // Видео выше канваса - обрезаем по вертикали
+        drawWidth = video.videoWidth;
+        drawHeight = video.videoWidth / canvasAspect;
+        offsetX = 0;
+        offsetY = (video.videoHeight - drawHeight) / 2;
+      }
+      
+      // Очищаем и рисуем видео с правильными пропорциями
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(
+        video,
+        offsetX, offsetY, drawWidth, drawHeight,
+        0, 0, canvas.width, canvas.height
+      );
+      
+      // Масштаб для рамок
+      const scaleX = canvas.width / drawWidth;
+      const scaleY = canvas.height / drawHeight;
       
       // Рисуем последние известные предсказания
       if (lastPredictions.length > 0) {
@@ -544,38 +714,45 @@
         ctx.shadowOffsetY = 1;
         
         lastPredictions.forEach(pred => {
-          // Масштабируем координаты
           const [x, y, width, height] = pred.bbox;
-          const scaledX = x * scaleX;
-          const scaledY = y * scaleY;
+          
+          // Корректируем координаты с учетом обрезки
+          const adjustedX = x - offsetX;
+          const adjustedY = y - offsetY;
+          
+          // Проверяем, что рамка в области отрисовки
+          if (adjustedX + width < 0 || adjustedY + height < 0 || 
+              adjustedX > drawWidth || adjustedY > drawHeight) {
+            return;
+          }
+          
+          // Масштабируем координаты
+          const scaledX = adjustedX * scaleX;
+          const scaledY = adjustedY * scaleY;
           const scaledWidth = width * scaleX;
           const scaledHeight = height * scaleY;
           
           const text = `${pred.class} (${Math.round(pred.score * 100)}%)`;
           
-          // Рамка
           ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
           
-          // Фон текста
           ctx.fillStyle = '#ff2a2a';
           const textWidth = ctx.measureText(text).width;
           const textHeight = 22;
           ctx.fillRect(scaledX, scaledY - textHeight - 4, textWidth + 12, textHeight + 4);
           
-          // Текст
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 15px "Inter", -apple-system, sans-serif';
           ctx.fillText(text, scaledX + 6, scaledY - 8);
         });
         
-        // Сбрасываем тени
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
       }
     }
 
-    // ---------- Цикл обнаружения объектов (оптимизированный) ----------
+    // ---------- Цикл обнаружения объектов ----------
     async function detectionLoop() {
       if (!isDetecting || !isVideoReady) return;
       
@@ -587,13 +764,11 @@
         lastDetectionTime = now;
         
         try {
-          // Модель работает с оригинальным видео
           const predictions = await model.detect(video);
           
           if (isDetecting) {
             lastPredictions = predictions;
             
-            // Обновляем счетчик объектов
             const count = predictions.length;
             objectsCountSpan.textContent = `${count} объект${getPlural(count)}`;
           }
@@ -670,16 +845,16 @@
       cameraContainer.removeEventListener('touchend', handleTouchEnd);
     }
 
-    // ---------- Запуск камеры (исправленное ожидание) ----------
+    // ---------- Запуск камеры ----------
     async function startCamera() {
       try {
         setStatus('loading', 'Доступ к камере...');
         statusDot.classList.add('loading');
         
+        const constraints = getVideoConstraints();
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
         
-        // Ждем готовности видео (с учетом уже загруженных метаданных)
         await new Promise((resolve) => {
           if (video.readyState >= 2) {
             resolve();
@@ -688,12 +863,10 @@
           }
         });
         
-        // Запускаем воспроизведение
         try {
           await video.play();
         } catch (playErr) {
           console.warn('Автовоспроизведение:', playErr);
-          // Пробуем еще раз с взаимодействием пользователя
           await new Promise(res => {
             const playOnTouch = () => {
               video.play().then(res).catch(res);
@@ -705,6 +878,9 @@
         
         isVideoReady = true;
         
+        // Инициализируем размер канваса
+        updateCanvasSize();
+        
         setStatus('active', 'Камера активна');
         statusDot.classList.add('active');
         statusDot.classList.remove('loading');
@@ -712,7 +888,6 @@
         toggleBtn.textContent = '■ Остановить';
         objectsCountSpan.textContent = '0 объектов';
         
-        // Включаем слушатели жестов
         cameraContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
         cameraContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
         cameraContainer.addEventListener('touchend', handleTouchEnd);
@@ -720,11 +895,9 @@
         
         resetZoom();
         
-        // Сбрасываем счетчик FPS
         fpsFrameCount = 0;
         fpsLastTime = performance.now();
         
-        // Запускаем циклы
         isDetecting = true;
         lastDetectionTime = 0;
         lastRenderTime = 0;
@@ -739,7 +912,17 @@
         statusDot.classList.remove('loading', 'active');
         statusText.textContent = 'Ошибка камеры';
         toggleBtn.textContent = '↻ Повторить';
-        alert('Не удалось получить доступ к камере.');
+        
+        // Пробуем fallback с базовым разрешением
+        if (currentResolution !== '480') {
+          currentResolution = '480';
+          resBtns.forEach(b => {
+            b.classList.toggle('active', b.dataset.res === '480');
+          });
+          resInfo.textContent = RESOLUTION_PRESETS['480'].description;
+        }
+        
+        alert('Не удалось получить доступ к камере в выбранном разрешении. Попробуйте SD.');
         return false;
       }
     }
@@ -764,8 +947,17 @@
       }
     }
 
+    // ---------- Отслеживание изменения размера окна ----------
+    function handleResize() {
+      if (isVideoReady) {
+        updateCanvasSize();
+      }
+    }
+
     // ---------- Инициализация ----------
     async function initApp() {
+      initResolutionSelector();
+      
       toggleBtn.disabled = true;
       toggleBtn.textContent = 'Загрузка...';
       setStatus('loading', 'Загрузка модели');
@@ -785,6 +977,11 @@
       window.addEventListener('beforeunload', () => {
         if (stream) stream.getTracks().forEach(t => t.stop());
       });
+      
+      window.addEventListener('resize', handleResize);
+      
+      // Инициализация информации о разрешении
+      resInfo.textContent = RESOLUTION_PRESETS['720'].description;
     }
 
     initApp();
