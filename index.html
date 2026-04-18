@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+какое применение можно найти этому сайту <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Multi-Model · Обнаружение объектов с выбором AI</title>
+  <title>Обнаружение объектов + Жесты зумирования · COCO-SSD</title>
   <style>
     * {
       margin: 0;
@@ -13,8 +13,8 @@
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif;
-      background: #0f0f0f;
-      color: #fff;
+      background: #fafafa;
+      color: #1a1a1a;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -30,18 +30,19 @@
       height: 100dvh;
       display: flex;
       flex-direction: column;
-      background: #000;
+      background: #ffffff;
       position: relative;
     }
 
+    /* Зона камеры — с поддержкой жестов */
     .camera-container {
       flex: 1;
       position: relative;
       width: 100%;
-      background: #1a1a1a;
+      background: #f5f5f5;
       overflow: hidden;
       border-radius: 0;
-      touch-action: none;
+      touch-action: none;  /* предотвращаем скролл страницы при жестах */
     }
 
     video {
@@ -70,71 +71,23 @@
       will-change: transform;
     }
 
-    .model-selector {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      right: 20px;
-      z-index: 30;
-      background: rgba(20, 20, 20, 0.85);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      padding: 12px 18px;
-      border-radius: 40px;
-      border: 0.5px solid rgba(255,255,255,0.15);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    }
-
-    .model-selector select {
-      width: 100%;
-      background: transparent;
-      border: none;
-      color: #fff;
-      font-size: 16px;
-      font-weight: 500;
-      padding: 8px 12px;
-      outline: none;
-      cursor: pointer;
-    }
-
-    .model-selector select option {
-      background: #1a1a1a;
-      color: #fff;
-    }
-
-    .fps-counter {
-      position: absolute;
-      top: 90px;
-      right: 20px;
-      z-index: 30;
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      padding: 8px 16px;
-      border-radius: 30px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #00ff88;
-      border: 0.5px solid rgba(0,255,136,0.3);
-      letter-spacing: 0.5px;
-    }
-
+    /* Индикатор зума — минималистичный */
     .zoom-indicator {
       position: absolute;
-      bottom: 120px;
+      bottom: 100px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      padding: 12px 28px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 10px 22px;
       border-radius: 50px;
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 500;
-      color: #fff;
-      letter-spacing: 0.5px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-      border: 0.5px solid rgba(255,255,255,0.1);
+      color: #1a1a1a;
+      letter-spacing: 0.3px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+      border: 0.5px solid rgba(0,0,0,0.05);
       z-index: 25;
       opacity: 0;
       transition: opacity 0.25s;
@@ -145,10 +98,11 @@
       opacity: 1;
     }
 
+    /* Панель управления — лёгкая */
     .controls {
-      padding: 16px 20px 22px;
-      background: #0a0a0a;
-      border-top: 1px solid #2a2a2a;
+      padding: 18px 22px 22px;
+      background: #ffffff;
+      border-top: 1px solid #eaeaea;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -159,160 +113,125 @@
     .status-area {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 14px;
-      font-weight: 500;
-      color: #aaa;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 450;
+      color: #555;
     }
 
     .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 12px;
-      background: #444;
-      transition: all 0.3s;
+      width: 10px;
+      height: 10px;
+      border-radius: 10px;
+      background: #ddd;
+      transition: background 0.2s;
     }
 
     .dot.active {
-      background: #00ff88;
-      box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+      background: #ff3b30;
+      box-shadow: 0 0 8px rgba(255, 59, 48, 0.25);
     }
 
     .dot.loading {
-      background: #ffaa00;
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      background: #f39c12;
     }
 
     button {
-      background: #1a1a1a;
-      border: 1px solid #333;
-      color: #fff;
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      color: #1a1a1a;
       font-size: 15px;
-      font-weight: 500;
+      font-weight: 480;
       padding: 12px 24px;
-      border-radius: 40px;
+      border-radius: 50px;
       cursor: pointer;
       transition: all 0.2s ease;
       letter-spacing: 0.3px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      min-width: 110px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+      min-width: 120px;
       text-align: center;
+      backdrop-filter: blur(5px);
     }
 
     button:active {
-      background: #2a2a2a;
+      background: #f5f5f5;
       transform: scale(0.97);
-      border-color: #555;
+      border-color: #ccc;
     }
 
     button:disabled {
-      opacity: 0.3;
+      opacity: 0.4;
       pointer-events: none;
+    }
+
+    .hint {
+      font-size: 14px;
+      color: #888;
+      white-space: nowrap;
     }
 
     .reset-zoom-btn {
-      background: #1a1a1a;
-      border: 1px solid #333;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
       padding: 10px 18px;
       margin-left: 8px;
       min-width: auto;
-      font-size: 16px;
+      font-size: 15px;
     }
 
-    .objects-badge {
-      background: #1a1a1a;
-      padding: 8px 16px;
-      border-radius: 30px;
-      border: 0.5px solid #333;
-      font-size: 14px;
-      color: #00ff88;
-      font-weight: 600;
-    }
-
+    /* Загрузка модели — светлый оверлей */
     .loader-overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: #0a0a0a;
+      background: #fafafa;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
-      transition: opacity 0.5s;
+      z-index: 100;
+      transition: opacity 0.4s;
       pointer-events: none;
     }
-
     .loader-message {
-      background: rgba(20,20,20,0.95);
-      padding: 24px 40px;
+      background: rgba(255,255,255,0.9);
+      padding: 22px 36px;
       border-radius: 60px;
       font-size: 18px;
-      font-weight: 500;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 0.5px solid #333;
-      color: #fff;
+      font-weight: 420;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 0.5px solid #ddd;
+      color: #333;
       letter-spacing: 0.5px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.04);
     }
 
-    .model-badge {
-      color: #888;
-      font-size: 13px;
-      margin-left: 8px;
-    }
-
+    /* Адаптация */
     @media (max-width: 480px) {
       .controls {
-        padding: 12px 14px 16px;
+        padding: 14px 16px 18px;
       }
       button {
-        padding: 10px 16px;
+        padding: 12px 18px;
         font-size: 14px;
       }
-      .model-selector {
-        top: 15px;
-        left: 15px;
-        right: 15px;
-        padding: 8px 14px;
+      .hint {
+        display: none;
       }
-      .fps-counter {
-        top: 80px;
-        right: 15px;
-        padding: 6px 12px;
-        font-size: 12px;
+      .reset-zoom-btn {
+        padding: 10px 14px;
       }
     }
   </style>
-  
-  <!-- TensorFlow.js и модели -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
 </head>
 <body>
 <div class="app">
   <div class="loader-overlay" id="loaderOverlay">
-    <div class="loader-message">Загрузка моделей AI...</div>
+    <div class="loader-message">Загрузка модели COCO-SSD…</div>
   </div>
 
   <div class="camera-container" id="cameraContainer">
-    <!-- Селектор моделей -->
-    <div class="model-selector">
-      <select id="modelSelect" disabled>
-        <option value="coco-ssd" selected>🎯 COCO-SSD (Быстрая · 80 классов)</option>
-        <option value="mobilenet">🔬 MobileNet (Точнее · 1000 классов)</option>
-        <option value="custom-resnet">⚡ ResNet50</option>
-      </select>
-    </div>
-    
-    <!-- Счетчик FPS -->
-    <div class="fps-counter" id="fpsCounter">FPS: --</div>
-    
     <video id="video" playsinline autoplay muted></video>
     <canvas id="canvas"></canvas>
     <div class="zoom-indicator" id="zoomIndicator">🔍 1.0x</div>
@@ -321,12 +240,12 @@
   <div class="controls">
     <div class="status-area">
       <span class="dot" id="statusDot"></span>
-      <span id="statusText">Загрузка...</span>
+      <span id="statusText">Ожидание</span>
     </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <span class="objects-badge" id="objectsCount">0</span>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span class="hint" id="objectsCount">—</span>
       <button id="resetZoomBtn" class="reset-zoom-btn" title="Сбросить зум">⟲ 1x</button>
-      <button id="toggleCameraBtn">▶ Старт</button>
+      <button id="toggleCameraBtn">▶ Включить</button>
     </div>
   </div>
 </div>
@@ -347,40 +266,24 @@
     const loaderOverlay = document.getElementById('loaderOverlay');
     const cameraContainer = document.getElementById('cameraContainer');
     const zoomIndicator = document.getElementById('zoomIndicator');
-    const modelSelect = document.getElementById('modelSelect');
-    const fpsCounter = document.getElementById('fpsCounter');
 
     // ---------- Состояния ----------
-    let models = {
-      cocoSsd: null,
-      mobilenet: null
-    };
-    let currentModel = 'coco-ssd';
+    let model = null;
     let stream = null;
     let isDetecting = false;
     let detectionFrameId = null;
     let lastDetectionTime = 0;
-    let detectionInterval = 120;
+    const DETECTION_INTERVAL_MS = 120;
     
-    // FPS счетчик
-    let frameCount = 0;
-    let lastFpsUpdate = 0;
-    
-    // Зум
+    // Переменные для жестов зума
     let currentZoom = 1.0;
     const MIN_ZOOM = 1.0;
-    const MAX_ZOOM = 5.0;
+    const MAX_ZOOM = 4.0;
     let initialDistance = 0;
     let initialZoom = 1.0;
     let zoomIndicatorTimeout = null;
     
-    // Классы COCO
-    const cocoClasses = {
-      1: 'человек', 2: 'велосипед', 3: 'машина', 4: 'мотоцикл', 5: 'самолет',
-      6: 'автобус', 7: 'поезд', 8: 'грузовик', 9: 'лодка', 10: 'светофор',
-      // ... сокращено для примера
-    };
-
+    // Настройки камеры
     const constraints = {
       video: {
         facingMode: 'environment',
@@ -390,28 +293,7 @@
       audio: false
     };
 
-    // ---------- FPS Counter ----------
-    function updateFPS() {
-      frameCount++;
-      const now = performance.now();
-      if (now - lastFpsUpdate >= 1000) {
-        const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
-        fpsCounter.textContent = `FPS: ${fps}`;
-        frameCount = 0;
-        lastFpsUpdate = now;
-        
-        // Цветовая индикация
-        if (fps >= 20) {
-          fpsCounter.style.color = '#00ff88';
-        } else if (fps >= 10) {
-          fpsCounter.style.color = '#ffaa00';
-        } else {
-          fpsCounter.style.color = '#ff4444';
-        }
-      }
-    }
-
-    // ---------- UI статус ----------
+    // ---------- Обновление UI статуса ----------
     function setStatus(type, message) {
       statusText.textContent = message;
       statusDot.className = 'dot';
@@ -422,21 +304,25 @@
     function hideLoader() {
       if (loaderOverlay) {
         loaderOverlay.style.opacity = '0';
-        setTimeout(() => loaderOverlay.style.display = 'none', 500);
+        setTimeout(() => loaderOverlay.style.display = 'none', 400);
       }
     }
 
     // ---------- Управление зумом ----------
     function applyZoom(zoomValue) {
+      // Ограничиваем диапазон
       zoomValue = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomValue));
       currentZoom = zoomValue;
       
+      // Применяем трансформацию к видео и канвасу
       video.style.transform = `scale(${currentZoom})`;
       canvas.style.transform = `scale(${currentZoom})`;
       
+      // Показываем индикатор
       zoomIndicator.textContent = `🔍 ${currentZoom.toFixed(1)}x`;
       zoomIndicator.classList.add('visible');
       
+      // Скрываем индикатор через 1.5 секунды
       if (zoomIndicatorTimeout) clearTimeout(zoomIndicatorTimeout);
       zoomIndicatorTimeout = setTimeout(() => {
         zoomIndicator.classList.remove('visible');
@@ -447,9 +333,9 @@
       applyZoom(1.0);
     }
 
-    // ---------- Жесты ----------
+    // ---------- Обработчики жестов (Pinch-to-Zoom) ----------
     function handleTouchStart(e) {
-      if (!stream) return;
+      if (!stream) return; // только когда камера активна
       
       const touches = e.touches;
       if (touches.length === 2) {
@@ -480,59 +366,34 @@
     }
 
     function handleTouchEnd(e) {
+      if (!stream) return;
       initialDistance = 0;
     }
 
-    // ---------- Загрузка моделей ----------
-    async function loadAllModels() {
-      setStatus('loading', 'Загрузка COCO-SSD...');
-      
+    // ---------- Загрузка модели ----------
+    async function loadModel() {
+      setStatus('loading', 'Загрузка модели...');
       try {
-        // Загружаем COCO-SSD
-        models.cocoSsd = await cocoSsd.load();
-        console.log('✓ COCO-SSD загружена');
-        
-        setStatus('loading', 'Загрузка MobileNet...');
-        
-        // Загружаем MobileNet
-        models.mobilenet = await mobilenet.load();
-        console.log('✓ MobileNet загружена');
-        
-        setStatus('active', 'Модели готовы');
+        model = await cocoSsd.load();
+        setStatus('', 'Модель готова');
+        console.log('COCO-SSD модель загружена');
         hideLoader();
-        
-        modelSelect.disabled = false;
         toggleBtn.disabled = false;
-        toggleBtn.textContent = '▶ Старт';
-        
+        toggleBtn.textContent = '▶ Включить';
+        statusDot.classList.remove('loading');
+        statusDot.classList.add('active');
+        setStatus('active', 'Готово к запуску');
         return true;
       } catch (err) {
-        console.error('Ошибка загрузки моделей:', err);
-        setStatus('', 'Ошибка загрузки');
+        console.error('Ошибка загрузки модели:', err);
+        setStatus('', 'Ошибка модели');
+        statusDot.style.background = '#ff3b30';
+        statusText.textContent = 'Ошибка загрузки';
+        toggleBtn.disabled = true;
         hideLoader();
-        alert('Не удалось загрузить модели AI');
+        alert('Не удалось загрузить модель COCO-SSD.');
         return false;
       }
-    }
-
-    // ---------- Переключение модели ----------
-    function switchModel(modelName) {
-      currentModel = modelName;
-      
-      // Настраиваем интервал детекции под модель
-      switch(modelName) {
-        case 'coco-ssd':
-          detectionInterval = 100;
-          break;
-        case 'mobilenet':
-          detectionInterval = 150;
-          break;
-        case 'custom-resnet':
-          detectionInterval = 80; // Для POCO X7 Pro можно быстрее
-          break;
-      }
-      
-      console.log(`🔄 Переключено на ${modelName}, интервал: ${detectionInterval}ms`);
     }
 
     // ---------- Остановка камеры ----------
@@ -551,13 +412,14 @@
       if (video.srcObject) video.srcObject = null;
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      objectsCountSpan.textContent = '0';
-      fpsCounter.textContent = 'FPS: --';
+      objectsCountSpan.textContent = '—';
       setStatus('', 'Камера выключена');
       statusDot.classList.remove('active');
       
+      // Сбрасываем зум
       resetZoom();
       
+      // Убираем слушатели жестов
       cameraContainer.removeEventListener('touchstart', handleTouchStart);
       cameraContainer.removeEventListener('touchmove', handleTouchMove);
       cameraContainer.removeEventListener('touchend', handleTouchEnd);
@@ -574,7 +436,10 @@
         
         await new Promise((resolve) => {
           video.onloadedmetadata = () => {
-            video.play().then(resolve).catch(resolve);
+            video.play().then(resolve).catch((e) => {
+              console.warn('Автовоспроизведение:', e);
+              resolve();
+            });
           };
         });
         
@@ -583,165 +448,149 @@
         canvas.width = videoWidth;
         canvas.height = videoHeight;
         
-        setStatus('active', `Камера активна · ${currentModel}`);
+        setStatus('active', 'Камера активна');
         statusDot.classList.add('active');
         statusDot.classList.remove('loading');
         
-        toggleBtn.textContent = '■ Стоп';
-        objectsCountSpan.textContent = '0';
+        toggleBtn.textContent = '■ Остановить';
+        objectsCountSpan.textContent = '0 объектов';
         
+        // Включаем слушатели жестов
         cameraContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
         cameraContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
         cameraContainer.addEventListener('touchend', handleTouchEnd);
         cameraContainer.addEventListener('touchcancel', handleTouchEnd);
         
+        // Сбрасываем зум при старте
         resetZoom();
         
         isDetecting = true;
-        frameCount = 0;
-        lastFpsUpdate = performance.now();
         detectionLoop();
         
         return true;
       } catch (err) {
-        console.error('Ошибка камеры:', err);
+        console.error('Ошибка доступа к камере:', err);
         setStatus('', 'Нет доступа');
         statusDot.classList.remove('loading', 'active');
+        statusText.textContent = 'Ошибка камеры';
         toggleBtn.textContent = '↻ Повторить';
+        alert('Не удалось получить доступ к камере.');
         return false;
       }
     }
 
-    // ---------- Детекция с выбранной моделью ----------
-    async function detectObjects() {
-      if (!isDetecting || video.readyState !== 4) return [];
-      
-      try {
-        switch(currentModel) {
-          case 'coco-ssd':
-            if (!models.cocoSsd) return [];
-            return await models.cocoSsd.detect(video);
-            
-          case 'mobilenet':
-            if (!models.mobilenet) return [];
-            const predictions = await models.mobilenet.classify(video);
-            // Конвертируем в формат COCO
-            return predictions.map(p => ({
-              class: p.className.split(',')[0],
-              score: p.probability,
-              bbox: [10, 10, canvas.width - 20, 60] // Весь кадр
-            }));
-            
-          case 'custom-resnet':
-            // Для демонстрации используем COCO-SSD с другими настройками
-            if (!models.cocoSsd) return [];
-            return await models.cocoSsd.detect(video, 10, 0.4);
-            
-          default:
-            return [];
-        }
-      } catch (err) {
-        console.warn('Ошибка детекции:', err);
-        return [];
-      }
-    }
-
-    // ---------- Отрисовка результатов ----------
-    function drawPredictions(predictions) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      if (!predictions || predictions.length === 0) return;
-      
-      predictions.forEach(pred => {
-        if (pred.bbox) {
-          const [x, y, width, height] = pred.bbox;
-          
-          // Рамка
-          ctx.strokeStyle = '#00ff88';
-          ctx.lineWidth = 4;
-          ctx.strokeRect(x, y, width, height);
-          
-          // Фон текста
-          const text = `${pred.class} ${Math.round(pred.score * 100)}%`;
-          ctx.font = 'bold 16px "Inter", sans-serif';
-          const textWidth = ctx.measureText(text).width;
-          
-          ctx.fillStyle = '#00ff88';
-          ctx.fillRect(x, y - 30, textWidth + 20, 30);
-          
-          // Текст
-          ctx.fillStyle = '#000';
-          ctx.font = 'bold 14px "Inter", sans-serif';
-          ctx.fillText(text, x + 10, y - 10);
-        }
-      });
-    }
-
-    // ---------- Главный цикл ----------
-    async function detectionLoop() {
+    // ---------- Цикл обнаружения объектов ----------
+    function detectionLoop() {
       if (!isDetecting) return;
       
       const now = performance.now();
       
-      if (now - lastDetectionTime > detectionInterval) {
-        lastDetectionTime = now;
-        
-        const predictions = await detectObjects();
-        drawPredictions(predictions);
-        
-        const count = predictions.length;
-        objectsCountSpan.textContent = count;
+      if (video.readyState === 4 && model) {
+        if (now - lastDetectionTime > DETECTION_INTERVAL_MS) {
+          lastDetectionTime = now;
+          
+          model.detect(video).then(predictions => {
+            if (!isDetecting) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            ctx.font = 'bold 16px "Inter", -apple-system, sans-serif';
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = '#ff2a2a';
+            ctx.fillStyle = '#ff2a2a';
+            ctx.shadowColor = '#00000040';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            
+            predictions.forEach(pred => {
+              const [x, y, width, height] = pred.bbox;
+              const text = `${pred.class} (${Math.round(pred.score * 100)}%)`;
+              
+              ctx.strokeRect(x, y, width, height);
+              
+              ctx.fillStyle = '#ff2a2a';
+              ctx.shadowBlur = 6;
+              const textWidth = ctx.measureText(text).width;
+              const textHeight = 22;
+              ctx.fillRect(x, y - textHeight - 4, textWidth + 12, textHeight + 4);
+              
+              ctx.fillStyle = '#ffffff';
+              ctx.shadowBlur = 6;
+              ctx.font = 'bold 15px "Inter", -apple-system, sans-serif';
+              ctx.fillText(text, x + 6, y - 8);
+            });
+            
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            const count = predictions.length;
+            objectsCountSpan.textContent = `${count} объект${getPlural(count)}`;
+          }).catch(err => console.warn('Ошибка детекции:', err));
+        }
       }
-      
-      updateFPS();
       
       detectionFrameId = requestAnimationFrame(detectionLoop);
     }
 
-    // ---------- Обработчики ----------
+    function getPlural(n) {
+      const mod10 = n % 10;
+      const mod100 = n % 100;
+      if (mod10 === 1 && mod100 !== 11) return '';
+      else if ([2,3,4].includes(mod10) && ![12,13,14].includes(mod100)) return 'а';
+      else return 'ов';
+    }
+
+    // ---------- Обработчик кнопки ВКЛ/ВЫКЛ ----------
     async function onToggleCamera() {
       if (stream) {
         stopCameraAndDetection();
-        toggleBtn.textContent = '▶ Старт';
-        objectsCountSpan.textContent = '0';
+        toggleBtn.textContent = '▶ Включить';
+        objectsCountSpan.textContent = '—';
       } else {
         toggleBtn.disabled = true;
         toggleBtn.textContent = '...';
         
         const success = await startCamera();
-        toggleBtn.disabled = false;
-        
         if (!success) {
-          toggleBtn.textContent = '▶ Старт';
+          toggleBtn.disabled = false;
+          toggleBtn.textContent = '▶ Включить';
+        } else {
+          toggleBtn.disabled = false;
         }
-      }
-    }
-
-    function onModelChange(e) {
-      switchModel(e.target.value);
-      if (stream) {
-        setStatus('active', `Камера активна · ${currentModel}`);
       }
     }
 
     // ---------- Инициализация ----------
     async function initApp() {
       toggleBtn.disabled = true;
-      modelSelect.disabled = true;
+      toggleBtn.textContent = 'Загрузка...';
+      setStatus('loading', 'Загрузка модели');
       
-      const modelsLoaded = await loadAllModels();
-      
-      if (modelsLoaded) {
+      const modelLoaded = await loadModel();
+      if (modelLoaded) {
         toggleBtn.disabled = false;
-        modelSelect.disabled = false;
+        toggleBtn.textContent = '▶ Включить';
+        setStatus('', 'Готово');
+        statusDot.classList.add('active');
+      } else {
+        toggleBtn.textContent = 'Ошибка';
       }
       
       toggleBtn.addEventListener('click', onToggleCamera);
       resetZoomBtn.addEventListener('click', resetZoom);
-      modelSelect.addEventListener('change', onModelChange);
       
       window.addEventListener('beforeunload', () => {
         if (stream) stream.getTracks().forEach(t => t.stop());
+      });
+      
+      window.addEventListener('resize', () => {
+        if (video.videoWidth && video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
       });
     }
 
