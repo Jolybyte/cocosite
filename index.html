@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>NEURAL SCAN // CYBERPUNK OBJECT DETECTION</title>
+  <!-- TensorFlow.js и COCO-SSD -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;600;800&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0a030c;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      padding: 8px;
+      background-image: 
+        linear-gradient(rgba(180, 0, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 30px 30px;
+    }
+
+    /* Основной кибер-контейнер */
+    .cyber-container {
+      max-width: 900px;
+      width: 100%;
+      background: rgba(8, 12, 24, 0.85);
+      backdrop-filter: blur(12px);
+      border: 2px solid #00f7ff;
+      box-shadow: 
+        0 0 30px #00e0ff80,
+        inset 0 0 20px #3a0ca340,
+        0 0 60px #b100ff40;
+      border-radius: 24px;
+      padding: 20px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.2s;
+      clip-path: polygon(0% 0%, 100% 0%, 100% 98%, 97% 100%, 0% 100%);
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 4px; }
+      .cyber-container { 
+        border-radius: 16px; 
+        padding: 16px 10px 18px;
+        clip-path: polygon(0% 0%, 100% 0%, 100% 99%, 95% 100%, 0% 100%);
+      }
+    }
+
+    /* Заголовок в стиле киберпанк */
+    .neon-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      border-bottom: 2px solid #ff00c1;
+      padding-bottom: 10px;
+      margin-bottom: 18px;
+      text-shadow: 0 0 8px #f0f, 0 0 20px #0ff;
+    }
+
+    .glitch-title {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 800;
+      font-size: 2rem;
+      letter-spacing: 4px;
+      color: #00f7ff;
+      text-transform: uppercase;
+      position: relative;
+      animation: textflicker 3s infinite;
+    }
+
+    .glitch-title::before,
+    .glitch-title::after {
+      content: 'OBJECT DETECT';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .glitch-title::before {
+      color: #ff00c1;
+      z-index: -1;
+      animation: glitch1 0.8s infinite;
+    }
+
+    .glitch-title::after {
+      color: #0ff;
+      z-index: -2;
+      animation: glitch2 0.8s infinite;
+    }
+
+    @keyframes glitch1 {
+      0%, 100% { clip-path: inset(0 0 90% 0); transform: translate(-2px, -1px); }
+      20% { clip-path: inset(40% 0 20% 0); transform: translate(2px, 1px); }
+      40% { clip-path: inset(70% 0 10% 0); transform: translate(-1px, -2px); }
+      60% { clip-path: inset(20% 0 60% 0); transform: translate(2px, 2px); }
+    }
+    @keyframes glitch2 {
+      0%, 100% { clip-path: inset(80% 0 5% 0); transform: translate(2px, 1px); }
+      20% { clip-path: inset(10% 0 70% 0); transform: translate(-2px, -2px); }
+      40% { clip-path: inset(30% 0 40% 0); transform: translate(1px, 2px); }
+      60% { clip-path: inset(60% 0 15% 0); transform: translate(-2px, 1px); }
+    }
+
+    .model-badge {
+      background: #1a0b2e;
+      border: 1.5px solid #b100ff;
+      color: #d4b3ff;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-family: 'Share Tech Mono';
+      font-weight: bold;
+      font-size: 0.9rem;
+      box-shadow: 0 0 12px #b100ff;
+      letter-spacing: 2px;
+    }
+
+    /* Видео зона с HUD эффектами */
+    .scan-area {
+      position: relative;
+      width: 100%;
+      border: 2px solid #0ff;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 0 30px #00ffff80, inset 0 0 30px #000;
+      margin-bottom: 18px;
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+    }
+
+    @media (max-width: 480px) {
+      .video-wrapper { aspect-ratio: auto; min-height: 260px; max-height: 60vh; }
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: contrast(1.2) brightness(1.1) saturate(1.4);
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Сканирующая линия */
+    .scan-line {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, transparent, #0ff, #f0f, transparent);
+      box-shadow: 0 0 20px cyan;
+      opacity: 0.7;
+      animation: scanVertical 4s linear infinite;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    @keyframes scanVertical {
+      0% { top: -10px; opacity: 0.9; }
+      80% { opacity: 0.6; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* Угловые HUD элементы */
+    .hud-corners {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .corner {
+      position: absolute;
+      width: 30px; height: 30px;
+      border-style: solid;
+      border-color: #0ff;
+      filter: drop-shadow(0 0 8px cyan);
+    }
+    .corner-tl { top: 10px; left: 10px; border-width: 3px 0 0 3px; }
+    .corner-tr { top: 10px; right: 10px; border-width: 3px 3px 0 0; }
+    .corner-bl { bottom: 10px; left: 10px; border-width: 0 0 3px 3px; }
+    .corner-br { bottom: 10px; right: 10px; border-width: 0 3px 3px 0; }
+
+    /* Оверлей загрузки в киберстиле */
+    .cyber-loader {
+      position: absolute;
+      inset: 0;
+      background: rgba(2, 5, 19, 0.9);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      border-radius: 16px;
+      border: 2px solid #ff00c1;
+    }
+
+    .hex-spinner {
+      width: 70px;
+      height: 70px;
+      background: conic-gradient(from 0deg, #0ff, #f0f, #0ff);
+      border-radius: 10% 30% 10% 30%;
+      animation: spinHex 2s linear infinite;
+      filter: drop-shadow(0 0 20px #b100ff);
+      margin-bottom: 25px;
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    }
+
+    @keyframes spinHex { 100% { transform: rotate(360deg); } }
+
+    .loading-text {
+      font-family: 'Orbitron', sans-serif;
+      color: #0ff;
+      font-size: 1.4rem;
+      text-shadow: 0 0 15px blue;
+      letter-spacing: 6px;
+    }
+    .loading-bar {
+      width: 200px; height: 6px;
+      background: #1e1230;
+      margin-top: 20px;
+      border: 1px solid #f0f;
+    }
+    .loading-bar-fill {
+      width: 70%; height: 100%;
+      background: #0ff;
+      box-shadow: 0 0 12px cyan;
+      animation: loadPulse 1.8s infinite;
+    }
+    @keyframes loadPulse { 0%,100% { opacity: 0.9; } 50% { opacity: 0.4; } }
+
+    /* Статистика — кибер-панель */
+    .stats-panel {
+      display: flex;
+      justify-content: space-between;
+      background: #0e0a1c;
+      border: 1px solid #b100ff;
+      padding: 12px 20px;
+      margin: 10px 0 16px;
+      border-radius: 40px;
+      box-shadow: inset 0 0 10px #000, 0 0 15px #a200ff;
+      color: #bbd9ff;
+      font-size: 1.1rem;
+    }
+
+    .neon-count {
+      font-size: 1.8rem;
+      font-weight: 800;
+      font-family: 'Orbitron';
+      color: #0ff;
+      text-shadow: 0 0 12px #0ff;
+      line-height: 1;
+    }
+
+    /* Список объектов — терминальный стиль */
+    .terminal-list {
+      background: #03010a;
+      border: 1px solid #0ff;
+      padding: 14px 12px;
+      margin-bottom: 20px;
+      border-radius: 20px;
+      min-height: 90px;
+      max-height: 150px;
+      overflow-y: auto;
+      box-shadow: inset 0 0 20px #000, 0 0 10px #00b7ff;
+      scrollbar-width: thin;
+      scrollbar-color: #ff00c1 #1a0e2e;
+    }
+
+    .cyber-tag {
+      display: inline-block;
+      background: #170e2b;
+      border-left: 6px solid #ff00c1;
+      padding: 7px 16px;
+      margin: 5px;
+      border-radius: 0 20px 20px 0;
+      color: #b4f0ff;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-size: 0.9rem;
+      box-shadow: 0 0 8px #f0f;
+      font-family: 'Share Tech Mono';
+    }
+
+    .empty-terminal {
+      color: #5f7a9c;
+      padding: 10px 12px;
+      font-style: italic;
+    }
+
+    /* Панель управления */
+    .cyber-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #0b0716;
+      padding: 8px 20px;
+      border-radius: 60px;
+      border: 1px solid #0ff;
+    }
+
+    .neon-led {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #0f0;
+      box-shadow: 0 0 18px #0f0;
+      transition: 0.2s;
+    }
+    .neon-led.off {
+      background: #5a2e5a;
+      box-shadow: none;
+    }
+
+    .cyber-btn {
+      background: transparent;
+      border: 2px solid #0ff;
+      color: #0ff;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 0px 20px 0px 20px;
+      font-size: 1rem;
+      letter-spacing: 3px;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 0 15px #0ff, inset 0 0 8px #0ff40;
+      transition: 0.15s;
+      background: #0a1020c0;
+      backdrop-filter: blur(4px);
+    }
+
+    .cyber-btn.primary {
+      border-color: #ff00c1;
+      color: #ffe6ff;
+      box-shadow: 0 0 20px #ff00c1, inset 0 0 8px #ffb3ff;
+    }
+
+    .cyber-btn:active {
+      transform: scale(0.95);
+      background: #0ff20;
+      box-shadow: 0 0 30px currentColor;
+    }
+
+    .cyber-btn:disabled {
+      opacity: 0.4;
+      filter: grayscale(0.5);
+      pointer-events: none;
+      box-shadow: none;
+    }
+
+    #camStatusText { color: #b0f0ff; font-size: 1rem; }
+  </style>
+</head>
+<body>
+<div class="cyber-container">
+  
+  <!-- Заголовок -->
+  <div class="neon-header">
+    <div class="glitch-title">//NEURAL_SCAN</div>
+    <div class="model-badge">COCO-SSD_v2.2</div>
+  </div>
+
+  <!-- Видео-зона -->
+  <div class="scan-area">
+    <div class="video-wrapper">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="scan-line"></div>
+      <div class="hud-corners">
+        <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner corner-br"></div>
+      </div>
+    </div>
+
+    <!-- Загрузочный экран -->
+    <div id="cyberLoader" class="cyber-loader">
+      <div class="hex-spinner"></div>
+      <div class="loading-text">INIT NEURAL NET</div>
+      <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+      <div style="color:#a0b0ff; margin-top: 20px;">COCO-SSD · MOBILENET V2</div>
+    </div>
+  </div>
+
+  <!-- Статистика -->
+  <div class="stats-panel">
+    <span>[ OBJECTS DETECTED ]</span>
+    <span class="neon-count" id="objectCount">00</span>
+  </div>
+
+  <!-- Терминал обнаружений -->
+  <div class="terminal-list" id="detectionsTerminal">
+    <div class="empty-terminal">> AWAITING SCAN_</div>
+  </div>
+
+  <!-- Панель управления -->
+  <div class="cyber-controls">
+    <div class="status-indicator">
+      <span class="neon-led off" id="camLed"></span>
+      <span id="camStatusText">SYS.OFFLINE</span>
+    </div>
+    <div style="display: flex; gap: 12px;">
+      <button class="cyber-btn" id="toggleCamBtn">[ POWER ]</button>
+      <button class="cyber-btn primary" id="detectBtn" disabled>⟳ SCAN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    "use strict";
+
+    // ----- DOM элементы -----
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const loader = document.getElementById('cyberLoader');
+    const camLed = document.getElementById('camLed');
+    const camStatusText = document.getElementById('camStatusText');
+    const toggleCamBtn = document.getElementById('toggleCamBtn');
+    const detectBtn = document.getElementById('detectBtn');
+    const objectCountSpan = document.getElementById('objectCount');
+    const terminalDiv = document.getElementById('detectionsTerminal');
+
+    // ----- Переменные -----
+    let model = null;
+    let isModelReady = false;
+    let stream = null;
+    let isCameraActive = false;
+    let detectionInterval = null;
+    let isDetecting = false;
+    let lastDetections = [];
+
+    // ----- UI обновления -----
+    function updateCameraUI(active) {
+      if (active) {
+        camLed.className = 'neon-led';
+        camStatusText.textContent = 'CAM.ACTIVE';
+        toggleCamBtn.innerHTML = '[ SHUTDOWN ]';
+      } else {
+        camLed.className = 'neon-led off';
+        camStatusText.textContent = 'SYS.OFFLINE';
+        toggleCamBtn.innerHTML = '[ POWER ]';
+      }
+    }
+
+    function setModelReady(ready) {
+      isModelReady = ready;
+      if (ready) {
+        loader.style.opacity = '0';
+        setTimeout(() => { loader.style.display = 'none'; }, 400);
+      } else {
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+      }
+    }
+
+    function updateTerminal(detections) {
+      const count = detections.length;
+      objectCountSpan.textContent = count.toString().padStart(2, '0');
+      
+      if (count === 0) {
+        terminalDiv.innerHTML = '<div class="empty-terminal">> NO TARGETS IN RANGE_</div>';
+        return;
+      }
+      
+      const sorted = [...detections].sort((a,b) => b.score - a.score);
+      let html = '';
+      for (let i=0; i<Math.min(sorted.length, 12); i++) {
+        const d = sorted[i];
+        const percent = Math.round(d.score * 100);
+        html += `<span class="cyber-tag">${d.class} :: ${percent}%</span>`;
+      }
+      if (sorted.length > 12) html += `<span class="cyber-tag">+${sorted.length-12} MORE</span>`;
+      terminalDiv.innerHTML = html;
+    }
+
+    // Остановка всего
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+      isCameraActive = false;
+      updateCameraUI(false);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      lastDetections = [];
+      updateTerminal([]);
+      detectBtn.disabled = true;
+      stopDetectionLoop();
+    }
+
+    function stopDetectionLoop() {
+      if (detectionInterval) {
+        clearInterval(detectionInterval);
+        detectionInterval = null;
+      }
+      isDetecting = false;
+    }
+
+    // Запуск камеры
+    async function startCamera() {
+      if (isCameraActive) return true;
+      try {
+        const constraints = { video: { facingMode: 'environment', width: {ideal:1280}, height: {ideal:720} }, audio: false };
+        let s;
+        try { s = await navigator.mediaDevices.getUserMedia(constraints); } 
+        catch { constraints.video.facingMode = undefined; s = await navigator.mediaDevices.getUserMedia(constraints); }
+        stream = s;
+        video.srcObject = stream;
+        await new Promise(r => { video.onloadedmetadata = () => { video.play().then(r).catch(r); }; if(video.readyState>=2) video.play().then(r).catch(r); });
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        isCameraActive = true;
+        updateCameraUI(true);
+        if (isModelReady) detectBtn.disabled = false;
+        return true;
+      } catch (e) {
+        alert('CAMERA ACCESS DENIED');
+        return false;
+      }
+    }
+
+    // Детекция кадра (кибер-рамки)
+    async function detectFrame() {
+      if (!isCameraActive || !model || !video.videoWidth) return;
+      if (isDetecting) return;
+      isDetecting = true;
+      try {
+        const predictions = await model.detect(video);
+        lastDetections = predictions;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#0ff';
+        ctx.lineWidth = 3.5;
+        ctx.font = 'bold 16px "Share Tech Mono", monospace';
+        ctx.textBaseline = 'top';
+        
+        for (let p of predictions) {
+          const [x, y, w, h] = p.bbox;
+          // неоновая рамка
+          ctx.strokeStyle = '#ff00c1';
+          ctx.shadowColor = '#ff00c1';
+          ctx.strokeRect(x, y, w, h);
+          ctx.strokeStyle = '#0ff';
+          ctx.shadowColor = '#0ff';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x-2, y-2, w+4, h+4);
+          
+          // подложка текста
+          ctx.shadowBlur = 10;
+          ctx.fillStyle = '#0b0015';
+          ctx.globalAlpha = 0.85;
+          const label = `${p.class} ${Math.round(p.score*100)}%`;
+          const textW = ctx.measureText(label).width + 18;
+          ctx.fillRect(x, y-32, textW, 28);
+          ctx.globalAlpha = 1.0;
+          ctx.fillStyle = '#0ff';
+          ctx.shadowColor = '#0ff';
+          ctx.fillText(label, x+8, y-26);
+        }
+        ctx.shadowBlur = 0;
+        updateTerminal(predictions);
+      } catch (e) { console.warn(e); } 
+      finally { isDetecting = false; }
+    }
+
+    function startScan() {
+      if (!isCameraActive) { alert('[!] POWER ON CAMERA FIRST'); return; }
+      if (!model) { alert('[!] NEURAL NET NOT READY'); return; }
+      stopDetectionLoop();
+      detectFrame();
+      detectionInterval = setInterval(() => detectFrame(), 160); // ~6 fps
+    }
+
+    async function toggleCamera() {
+      if (isCameraActive) { stopCamera(); stopDetectionLoop(); }
+      else { 
+        if (!isModelReady) { alert('MODEL STILL COMPILING...'); return; }
+        await startCamera(); 
+      }
+    }
+
+    // Загрузка модели
+    async function loadCyberModel() {
+      try {
+        model = await cocoSsd.load({ base: 'mobilenet_v2' });
+        setModelReady(true);
+        if (isCameraActive) detectBtn.disabled = false;
+      } catch (err) {
+        loader.innerHTML = '<div style="color:#ff4d4d">MODEL LOAD FAIL</div>';
+        console.error(err);
+      }
+    }
+
+    // Инициализация
+    function bindEvents() {
+      toggleCamBtn.addEventListener('click', toggleCamera);
+      detectBtn.addEventListener('click', startScan);
+      window.addEventListener('resize', () => {
+        if (isCameraActive && video.videoWidth) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
+      });
+    }
+
+    function init() {
+      bindEvents();
+      loadCyberModel();
+      detectBtn.disabled = true;
+      updateCameraUI(false);
+    }
+    init();
+  })();
+</script>
+</body>
+</html>
